@@ -2,7 +2,9 @@
 # $ conda create --name <env> --file <this file>
 # platform: win-64
 @EXPLICIT
+https://repo.anaconda.com/pkgs/main/win-64/blas-1.0-mkl.tar.bz2#e8aa6b7daaf0925245c148aaeaa0722e
 https://conda.anaconda.org/conda-forge/win-64/ca-certificates-2019.11.28-hecc5488_0.tar.bz2#8c58c4b7bae4f2300083a1e4a8341cd3
+https://repo.anaconda.com/pkgs/main/win-64/icc_rt-2019.0.0-h0cc432a_1.tar.bz2#ce2949c239b5cd45848a0a7865d30520
 https://repo.anaconda.com/pkgs/main/win-64/intel-openmp-2019.4-245.tar.bz2#cd40f1846d3ada9ad3cfa61ef5fa7502
 https://conda.anaconda.org/conda-forge/win-64/libsvm-323-0.tar.bz2#bfeda92110eed464cf287d5fc64b418a
 https://conda.anaconda.org/conda-forge/win-64/vs2008_runtime-9.0.30729.6161-0.tar.bz2#9531fa584348748d666b66055c771182
@@ -12,7 +14,7 @@ https://conda.anaconda.org/conda-forge/win-64/eigen-3.3.7-hdc96acc_1001.tar.bz2#
 https://conda.anaconda.org/conda-forge/win-64/jpeg-9c-h0c8e037_1001.tar.bz2#6fda01fefb6ea9de2db6332c5faeb763
 https://conda.anaconda.org/conda-forge/win-64/libblas-3.8.0-14_mkl.tar.bz2#da90100ade46601af4a654fc0a3c4061
 https://conda.anaconda.org/conda-forge/win-64/openssl-1.1.1d-h0c8e037_0.tar.bz2#86ce2d32b3082e3790b0e93b3c854d4a
-https://conda.anaconda.org/conda-forge/win-64/python-2.7.15-h2880e7c_1006.tar.bz2#df0056ce188a4e94dfd30e9261b532af
+https://conda.anaconda.org/conda-forge/win-64/python-2.7.15-h2880e7c_1009.tar.bz2#ceb03a3bfae107af0137657f1513b3bd
 https://conda.anaconda.org/conda-forge/win-64/tk-8.6.10-h0c8e037_0.tar.bz2#14f65bcf1d9cdf32c921ad553b3cebd2
 https://conda.anaconda.org/conda-forge/win-64/xz-5.2.4-h3cc03e0_1001.tar.bz2#de2bae909f62710b2c612f4b3c688f99
 https://conda.anaconda.org/conda-forge/win-64/zlib-1.2.11-h3cc03e0_1006.tar.bz2#ee979c67fdace75c048d9e93792dd637
@@ -73,7 +75,7 @@ https://conda.anaconda.org/conda-forge/noarch/cycler-0.10.0-py_2.tar.bz2#f6d7c7e
 https://conda.anaconda.org/conda-forge/win-64/freetype-2.10.0-h3bc688b_1.tar.bz2#f7ae9010d488df6ebb7a1e13a4f3f122
 https://conda.anaconda.org/conda-forge/noarch/more-itertools-5.0.0-py_0.tar.bz2#368d2cb3377851a482b2f2b080aad3ee
 https://conda.anaconda.org/conda-forge/win-64/numpy-1.16.5-py27h0d21db5_0.tar.bz2#7af838138a9a49b78f4ecdfab4ee80af
-https://conda.anaconda.org/conda-forge/noarch/packaging-20.0-py_0.tar.bz2#071dcd520a32cef9e148f1647719e334
+https://conda.anaconda.org/conda-forge/noarch/packaging-20.1-py_0.tar.bz2#b88d38a6e9c690857e2c24a50a5f4f13
 https://conda.anaconda.org/conda-forge/win-64/pathlib2-2.3.5-py27_0.tar.bz2#9ed64fb85c6807f9891d0aeafa6cc44e
 https://conda.anaconda.org/conda-forge/win-64/pysocks-1.7.1-py27_0.tar.bz2#d2e30ddfc2f5600286579e26d48c4c05
 https://conda.anaconda.org/conda-forge/noarch/python-dateutil-2.8.1-py_0.tar.bz2#0d0150ed9c2d25817f5324108d3f7571
@@ -89,16 +91,17 @@ https://conda.anaconda.org/conda-forge/noarch/mrcfile-1.1.2-py_1.tar.bz2#4c29953
 https://conda.anaconda.org/conda-forge/win-64/pickleshare-0.7.5-py27_1000.tar.bz2#e0e84db722cc5043865983a89b1f6064
 https://conda.anaconda.org/conda-forge/win-64/pillow-6.2.1-py27h1bb17ff_0.tar.bz2#b12bbbdae960d9c03128123d0a71ec4c
 https://conda.anaconda.org/conda-forge/noarch/pygments-2.5.2-py_0.tar.bz2#c48719b941c60b26add57de2b014ef96
+https://repo.anaconda.com/pkgs/main/win-64/scipy-1.2.1-py27h4c3ab11_0.tar.bz2#641ce2f41fb0235ce043d3b548a7a9fa
 https://conda.anaconda.org/conda-forge/win-64/tornado-5.1.1-py27h0c8e037_1000.tar.bz2#c7ff2443040bf1653d02e256441a2d9f
-https://conda.anaconda.org/conda-forge/win-64/wheel-0.33.6-py27_0.tar.bz2#0ab1e22911313add504112ff6598c66f
+https://conda.anaconda.org/conda-forge/win-64/wheel-0.34.1-py27_0.tar.bz2#0e4f89d57b5822b1dde52b51c0a0065a
 https://conda.anaconda.org/conda-forge/noarch/zipp-1.0.0-py_0.tar.bz2#a3f50802a987a528c837113c7b705253
 https://conda.anaconda.org/conda-forge/win-64/importlib_metadata-1.4.0-py27_0.tar.bz2#536615428c2986577f3d7e978e99998f
 https://conda.anaconda.org/conda-forge/win-64/matplotlib-base-2.2.4-py27h6595424_2.tar.bz2#3d6384385c1a034274f4f0459326de30
-https://conda.anaconda.org/conda-forge/win-64/pip-19.3.1-py27_0.tar.bz2#8d1fa67f1c4527ef7c64335015314ccf
+https://conda.anaconda.org/conda-forge/win-64/pip-20.0.2-py27_0.tar.bz2#88ca293c7e86b049e50ad29b776cfaaf
 https://conda.anaconda.org/conda-forge/noarch/prompt_toolkit-1.0.15-py_1.tar.bz2#f5bea0930b268df84653cb32c8d1542f
 https://conda.anaconda.org/conda-forge/win-64/pyopenssl-19.1.0-py27_0.tar.bz2#f822df7b718731efc0cc3aac532e4e87
 https://conda.anaconda.org/conda-forge/win-64/reportlab-3.5.32-py27hdbef25a_0.tar.bz2#113cbe437d2083c7dd6c8edc1992cc6c
-https://conda.anaconda.org/conda-forge/win-64/ipython-5.8.0-py27_0.tar.bz2#5682fdd996f626f1bd1a5f1fe04284be
+https://conda.anaconda.org/conda-forge/win-64/ipython-5.8.0-py27_1.tar.bz2#6aa40630be9ddae85b09fdb3f51ff8d6
 https://conda.anaconda.org/conda-forge/noarch/pluggy-0.12.0-py_0.tar.bz2#4f6bebc7cd74327a736c244a756fab71
 https://conda.anaconda.org/conda-forge/win-64/urllib3-1.25.7-py27_0.tar.bz2#6004a197e53a50c671da155f9f56a8eb
 https://conda.anaconda.org/conda-forge/win-64/pytest-4.6.4-py27_0.tar.bz2#0db6164603e1f0e879e766e070ba6362
