@@ -100,14 +100,14 @@ https://conda.anaconda.org/conda-forge/linux-64/singledispatch-3.4.0.3-py27_1000
 https://conda.anaconda.org/conda-forge/linux-64/traitlets-4.3.3-py27_0.tar.bz2#2aa5bcf031b4d8afafb8da025faa4b52
 https://conda.anaconda.org/conda-forge/noarch/backports.functools_lru_cache-1.6.1-py_0.tar.bz2#d36df15eaef96549ce6231e3088fba54
 https://conda.anaconda.org/conda-forge/linux-64/cryptography-2.8-py27h72c5cf5_1.tar.bz2#990131ee8a49bf79b88a74cb745fc003
-https://conda.anaconda.org/conda-forge/noarch/jinja2-2.10.3-py_0.tar.bz2#3e5bb7e93590ee2fc291aea5ff70a8a2
+https://conda.anaconda.org/conda-forge/noarch/jinja2-2.11.0-py_0.tar.bz2#334a430563e6d0d011f506580cb6428f
 https://conda.anaconda.org/conda-forge/linux-64/pickleshare-0.7.5-py27_1000.tar.bz2#f169b28ae020a0471305f0e0c57f2d54
 https://conda.anaconda.org/conda-forge/noarch/pygments-2.5.2-py_0.tar.bz2#c48719b941c60b26add57de2b014ef96
 https://conda.anaconda.org/conda-forge/linux-64/reportlab-3.5.32-py27h7d98c4e_0.tar.bz2#ee2c162b203702aaa26078b81f60f870
 https://conda.anaconda.org/conda-forge/linux-64/tornado-5.1.1-py27h14c3975_1000.tar.bz2#adf3de0f4bc56b631b63e5b5dc0a8886
 https://conda.anaconda.org/conda-forge/linux-64/wheel-0.34.1-py27_0.tar.bz2#bc3f76f32ff28ca8792e28820811c82a
 https://conda.anaconda.org/conda-forge/noarch/zipp-1.0.0-py_0.tar.bz2#a3f50802a987a528c837113c7b705253
-https://conda.anaconda.org/conda-forge/linux-64/importlib_metadata-1.4.0-py27_0.tar.bz2#a98eda56f14ea8efa9315ca2f0b690b9
+https://conda.anaconda.org/conda-forge/linux-64/importlib_metadata-1.5.0-py27_0.tar.bz2#24a0aefdbb77ca1da9456ec88e52e881
 https://conda.anaconda.org/conda-forge/linux-64/matplotlib-base-2.2.4-py27h250f245_2.tar.bz2#4259cca978a32f7a8f0b2b793126eab9
 https://conda.anaconda.org/conda-forge/linux-64/pip-20.0.2-py27_0.tar.bz2#33d8b8a77c76a4d0ae5e9c691a00129f
 https://conda.anaconda.org/conda-forge/noarch/prompt_toolkit-1.0.15-py_1.tar.bz2#f5bea0930b268df84653cb32c8d1542f

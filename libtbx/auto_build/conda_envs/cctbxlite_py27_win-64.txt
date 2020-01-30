@@ -86,7 +86,7 @@ https://conda.anaconda.org/conda-forge/noarch/backports.functools_lru_cache-1.6.
 https://conda.anaconda.org/conda-forge/win-64/biopython-1.76-py27h0c8e037_0.tar.bz2#40b6bfb4f14cedc81a2773a285b802ec
 https://conda.anaconda.org/conda-forge/win-64/boost-1.70.0-py27h44f515a_1.tar.bz2#69573ce51ead39eb0b0a9519e79611de
 https://conda.anaconda.org/conda-forge/win-64/cryptography-2.8-py27h4d4881a_1.tar.bz2#f5981b0e165c4788831d0cdaac97231b
-https://conda.anaconda.org/conda-forge/noarch/jinja2-2.10.3-py_0.tar.bz2#3e5bb7e93590ee2fc291aea5ff70a8a2
+https://conda.anaconda.org/conda-forge/noarch/jinja2-2.11.0-py_0.tar.bz2#334a430563e6d0d011f506580cb6428f
 https://conda.anaconda.org/conda-forge/noarch/mrcfile-1.1.2-py_1.tar.bz2#4c29953e21c3d6a7ea62e558a0197035
 https://conda.anaconda.org/conda-forge/win-64/pickleshare-0.7.5-py27_1000.tar.bz2#e0e84db722cc5043865983a89b1f6064
 https://conda.anaconda.org/conda-forge/win-64/pillow-6.2.1-py27h1bb17ff_0.tar.bz2#b12bbbdae960d9c03128123d0a71ec4c
@@ -95,7 +95,7 @@ https://repo.anaconda.com/pkgs/main/win-64/scipy-1.2.1-py27h4c3ab11_0.tar.bz2#64
 https://conda.anaconda.org/conda-forge/win-64/tornado-5.1.1-py27h0c8e037_1000.tar.bz2#c7ff2443040bf1653d02e256441a2d9f
 https://conda.anaconda.org/conda-forge/win-64/wheel-0.34.1-py27_0.tar.bz2#0e4f89d57b5822b1dde52b51c0a0065a
 https://conda.anaconda.org/conda-forge/noarch/zipp-1.0.0-py_0.tar.bz2#a3f50802a987a528c837113c7b705253
-https://conda.anaconda.org/conda-forge/win-64/importlib_metadata-1.4.0-py27_0.tar.bz2#536615428c2986577f3d7e978e99998f
+https://conda.anaconda.org/conda-forge/win-64/importlib_metadata-1.5.0-py27_0.tar.bz2#b13886d23b97a5ca12606c7bf7446287
 https://conda.anaconda.org/conda-forge/win-64/matplotlib-base-2.2.4-py27h6595424_2.tar.bz2#3d6384385c1a034274f4f0459326de30
 https://conda.anaconda.org/conda-forge/win-64/pip-20.0.2-py27_0.tar.bz2#88ca293c7e86b049e50ad29b776cfaaf
 https://conda.anaconda.org/conda-forge/noarch/prompt_toolkit-1.0.15-py_1.tar.bz2#f5bea0930b268df84653cb32c8d1542f
