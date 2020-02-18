@@ -591,6 +591,50 @@ public:
 };
 
 
+/// fp of a scatterer
+/**
+ * We need to virtually inherit from scalar_parameter so that
+ * it can be multiply inherited, with one inheritance
+ * path going through this class.
+ */
+class asu_fp_parameter : public virtual scalar_parameter,
+                                public virtual single_asu_scatterer_parameter
+{
+public:
+  /// Variability property, directly linked to the scatterer grad_fp flag
+  //@{
+  virtual void set_variable(bool f);
+
+  virtual bool is_variable() const;
+  //@}
+
+  virtual void
+  write_component_annotations_for(scatterer_type const *scatterer,
+                                  std::ostream &output) const;
+
+  virtual void store(uctbx::unit_cell const &unit_cell) const;
+  virtual void validate();
+};
+
+
+class independent_fp_parameter : public asu_fp_parameter
+{
+public:
+  independent_fp_parameter(scatterer_type *scatterer)
+  : parameter(0),
+    single_asu_scatterer_parameter(scatterer)
+  {
+    value = scatterer->fp;
+  }
+
+  /// Does nothing in this class
+  /** This optimisation relies on class reparametrisation implementation
+   */
+  virtual void linearise(uctbx::unit_cell const &unit_cell,
+                         sparse_matrix_type *jacobian_transpose);
+};
+
+
 /// Isotropic thermal displacement parameter of a scatterer
 class asu_u_iso_parameter : public scalar_parameter,
                             public virtual single_asu_scatterer_parameter

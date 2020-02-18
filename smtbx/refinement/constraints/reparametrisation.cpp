@@ -168,6 +168,35 @@ namespace smtbx { namespace refinement { namespace constraints {
               sparse_matrix_type *jacobian_transpose)
   {}
 
+  // fp
+
+  void asu_fp_parameter::set_variable(bool f) {
+    scatterer->flags.set_grad_fp(f);
+  }
+
+  bool asu_fp_parameter::is_variable() const {
+    return scatterer->flags.grad_fp();
+  }
+
+  void asu_fp_parameter
+  ::write_component_annotations_for(scatterer_type const *scatterer,
+                                    std::ostream &output) const
+  {
+    if (scatterer == this->scatterer) output << scatterer->label << ".fp,";
+  }
+  void asu_fp_parameter::store(uctbx::unit_cell const &unit_cell) const {
+    scatterer->fp = value;
+  }
+  void asu_fp_parameter::validate() 
+  {}
+
+  // independent fp
+
+  void independent_fp_parameter
+  ::linearise(uctbx::unit_cell const &unit_cell,
+              sparse_matrix_type *jacobian_transpose)
+  {}
+
   // u_iso
 
   void asu_u_iso_parameter::set_variable(bool f) {
