@@ -99,9 +99,21 @@ def run(filenames, options):
 
   # At last...
   for sc in xm.xray_structure.scatterers():
-    sc.flags.set_grad_site(True)
-    if sc.flags.use_u_iso(): sc.flags.set_grad_u_iso(True)
-    if sc.flags.use_u_aniso(): sc.flags.set_grad_u_aniso(True)
+    #trying to refine only occupancy of first atom...
+    sc.flags.set_use(False)
+    sc.flags.set_use_u_iso(False)
+    sc.flags.set_use_u_aniso(False)
+    sc.flags.set_grad_site(False)
+    sc.flags.set_grad_u_iso(False)
+    sc.flags.set_grad_u_aniso(False)
+    sc.flags.set_grad_site(False)
+    #if sc.flags.use_u_iso(): sc.flags.set_grad_u_iso(True)
+    #if sc.flags.use_u_aniso(): sc.flags.set_grad_u_aniso(True)
+  #trying to refine only fp of first atom...
+  s0=xm.xray_structure.scatterers()[0]
+  s0.flags.set_use(True)
+  s0.flags.set_grad_fp(True)
+  s0.flags.set_grad_occupancy(True)
   ls = xm.least_squares()
   print("%i atoms" % len(ls.reparametrisation.structure.scatterers()))
   print("%i refined parameters" % ls.reparametrisation.n_independents)
