@@ -99,21 +99,30 @@ def run(filenames, options):
 
   # At last...
   for sc in xm.xray_structure.scatterers():
+    sc.flags.set_grad_site(True)
+    if sc.flags.use_u_iso(): sc.flags.set_grad_u_iso(True)
+    if sc.flags.use_u_aniso(): sc.flags.set_grad_u_aniso(True)
     #trying to refine only occupancy of first atom...
-    sc.flags.set_use(False)
-    sc.flags.set_use_u_iso(False)
-    sc.flags.set_use_u_aniso(False)
-    sc.flags.set_grad_site(False)
-    sc.flags.set_grad_u_iso(False)
-    sc.flags.set_grad_u_aniso(False)
-    sc.flags.set_grad_site(False)
-    #if sc.flags.use_u_iso(): sc.flags.set_grad_u_iso(True)
-    #if sc.flags.use_u_aniso(): sc.flags.set_grad_u_aniso(True)
-  #trying to refine only fp of first atom...
+    #sc.flags.set_use(False)
+    #sc.flags.set_use_u_iso(False)
+    #sc.flags.set_use_u_aniso(False)
+    #sc.flags.set_grad_site(False)
+    #sc.flags.set_grad_u_iso(False)
+    #sc.flags.set_grad_u_aniso(False)
+    #sc.flags.set_grad_site(False)
+    #print(sc.flags.use_fp_fdp())
+  #trying to refine only occupancy of first atom...
+
   s0=xm.xray_structure.scatterers()[0]
-  s0.flags.set_use(True)
+  s0.flags.set_use_fp_fdp(True)
   s0.flags.set_grad_fp(True)
-  s0.flags.set_grad_occupancy(True)
+  print("s0 fp: {}".format(s0.fp))
+  #import ipdb
+  #ipdb.set_trace()
+  #s0.flags.set_grad_fdp(True)
+  #print()
+  #for sc in xm.xray_structure.scatterers():
+    #print(sc.flags.use_fp_fdp())
   ls = xm.least_squares()
   print("%i atoms" % len(ls.reparametrisation.structure.scatterers()))
   print("%i refined parameters" % ls.reparametrisation.n_independents)
@@ -129,6 +138,7 @@ def run(filenames, options):
   t0 = current_time()
   cov = ls.covariance_matrix_and_annotations()
   print("Covariance matrix building: %.3f" % (current_time() - t0))
+  print("s0 fp: {}".format(s0.fp))
 
   # Write result to disk
   if out_ext != '.cif':

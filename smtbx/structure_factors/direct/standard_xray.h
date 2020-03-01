@@ -40,7 +40,7 @@ namespace smtbx { namespace structure_factors { namespace direct {
       complex_type structure_factor;
       grad_site_type grad_site;
       grad_u_star_type grad_u_star;
-      complex_type grad_u_iso, grad_occ;
+      complex_type grad_u_iso, grad_occ, grad_fp, grad_fdp;
     };
 
     /** Base class for the linearisation or the evaluation of the structure
@@ -110,6 +110,8 @@ namespace smtbx { namespace structure_factors { namespace direct {
       using core<float_type>::grad_u_star;                                     \
       using core<float_type>::grad_u_iso;                                      \
       using core<float_type>::grad_occ;                                        \
+      using core<float_type>::grad_fp;                                         \
+      using core<float_type>::grad_fdp;                                        \
       using base_t::hr_ht;                                                     \
       using base_t::d_star_sq;
 
@@ -221,6 +223,10 @@ namespace smtbx { namespace structure_factors { namespace direct {
             We hypothesised that an overzealous optimiser was at fault, hence
             the idea of the volatile member. That it solves the problem seems
             to vindicate our intuition.
+
+            The following line balances the extra (conditional) curly brace:
+            {
+
         */
         foo = grad_site.begin();
       }
@@ -428,6 +434,9 @@ namespace smtbx { namespace structure_factors { namespace direct {
             grad_u_star[j] = ff_iso * grad_u_star[j].real();
           }
         }
+        if (scatterer.flags.use_fp_fdp() && scatterer.flags.grad_fp()) {
+          grad_fp = structure_factor;
+        }
       }
     };
 
@@ -623,6 +632,12 @@ namespace smtbx { namespace structure_factors { namespace direct {
           }
           if (sc.flags.grad_occupancy()) {
             *grad_f_calc_cursor++ = l.grad_occ;
+          }
+          if (sc.flags.grad_fp()) {
+            *grad_f_calc_cursor++ = l.grad_fp;
+          }
+          if (sc.flags.grad_fdp()) {
+            *grad_f_calc_cursor++ = l.grad_fdp;
           }
         }
         if (f_mask) f_calc += *f_mask;

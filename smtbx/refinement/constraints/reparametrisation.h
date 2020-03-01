@@ -390,7 +390,7 @@ public:
 class asu_parameter : public virtual parameter
 {
 public:
-  typedef xray::scatterer<> scatterer_type;
+  typedef xray::scatterer<> scatterer_type; //the template has default params
   typedef af::const_ref<scatterer_type *> scatterer_sequence_type;
 
   /// The scatterers in the asu this models some parameters of.
