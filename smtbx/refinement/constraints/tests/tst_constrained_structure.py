@@ -61,6 +61,8 @@ class test_case(object):
     """ To be overriden by heirs that needs to perform extra tests """
 
   def check_mapping_to_grad_fc(self):
+    #import ipdb
+    #ipdb.set_trace()
     if self.expected_mapping_to_grad_fc is not None:
       assert (tuple(self.reparametrisation.mapping_to_grad_fc)
               == self.expected_mapping_to_grad_fc)
@@ -263,7 +265,10 @@ class sucrose_test_case(test_case):
       "H12B": (core.secondary_xh2_sites, 'C12'),
     }
 
-    self.expected_mapping_to_grad_fc = (
+    #This hardcoded result is obsolete because fp is now also added to the
+    #parameter array all. Thus the parameter indices are shifted up by up
+    #to 45 (the number of atoms in sucrose).
+    self.old_expected_mapping_to_grad_fc = (
       59,60,61 , # O1.site
       80,81,82,83,84,85 , # O1.u
       0,1,2 , # O2.site
@@ -355,6 +360,29 @@ class sucrose_test_case(test_case):
       367,368,369 , # H12A.site
       239 , # H12A.u
     )
+    self.expected_mapping_to_grad_fc = (
+            59, 60, 61, 80, 81, 82, 83, 84, 85, 0, 1, 2, 86, 87, 88, 89, 90, 91,
+            349, 350, 351, 92, 7, 8, 9, 93, 94, 95, 96, 97, 98, 352, 353, 354, 
+            99, 14, 15, 16, 100, 101, 102, 103, 104, 105, 355, 356, 357, 106,
+            21, 22, 23, 107, 108, 109, 110, 111, 112, 358, 359, 360, 113, 76,
+            77, 78, 114, 115, 116, 117, 118, 119, 28, 29, 30, 120, 121, 122,
+            123, 124, 125, 361, 362, 363, 126, 35, 36, 37, 127, 128, 129, 130, 
+            131, 132, 364, 365, 366, 133, 42, 43, 44, 134, 135, 136, 137, 138, 
+            139, 367, 368, 369, 140, 49, 50, 51, 141, 142, 143, 144, 145, 146, 
+            370, 371, 372, 147, 66, 67, 68, 148, 149, 150, 151, 152, 153, 56, 
+            57, 58, 154, 155, 156, 157, 158, 159, 373, 374, 375, 160, 3, 4, 5, 
+            161, 162, 163, 164, 165, 166, 379, 380, 381, 167, 10, 11, 12, 168, 
+            169, 170, 171, 172, 173, 382, 383, 384, 174, 17, 18, 19, 175, 176, 
+            177, 178, 179, 180, 376, 377, 378, 181, 385, 386, 387, 182, 24, 25,
+            26, 183, 184, 185, 186, 187, 188, 388, 389, 390, 189, 63, 64, 65, 
+            190, 191, 192, 193, 194, 195, 391, 392, 393, 196, 69, 70, 71, 197, 
+            198, 199, 200, 201, 202, 52, 53, 54, 203, 204, 205, 206, 207, 208, 
+            397, 398, 399, 209, 394, 395, 396, 210, 45, 46, 47, 211, 212, 213, 
+            214, 215, 216, 400, 401, 402, 217, 38, 39, 40, 218, 219, 220, 221, 
+            222, 223, 403, 404, 405, 224, 73, 74, 75, 225, 226, 227, 228, 229, 
+            230, 406, 407, 408, 231, 31, 32, 33, 232, 233, 234, 235, 236, 237, 
+            409, 410, 411, 238, 412, 413, 414, 239
+            )
 
     self.site_refinement_tolerance = 1e-4
 
