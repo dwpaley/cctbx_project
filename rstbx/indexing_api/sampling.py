@@ -61,8 +61,9 @@ class SimpleSampler(sampling.SimpleSamplerTool):
                                   grid=self.incr)
 
 class HemisphereSampler(SimpleSampler):
-  def __init__(self,max_grid,characteristic_grid,quick_grid):
+  def __init__(self,max_grid,characteristic_grid,quick_grid,march2020_bugfix=True):
     self.quick_grid = quick_grid
+    self.march2020_bugfix = march2020_bugfix
     SimpleSampler.__init__(self,max_grid,characteristic_grid)
 
     if self.quick_grid >= self.incr:
@@ -119,7 +120,10 @@ class HemisphereSampler(SimpleSampler):
            break
       if direction_ok:
         unique_clusters+=1
-      hemisphere_solutions_sort.append(test_item)
+        if self.march2020_bugfix:
+          hemisphere_solutions_sort.append(test_item)
+      if not self.march2020_bugfix:
+        hemisphere_solutions_sort.append(test_item)
       perm_idx+=1
 
     return hemisphere_solutions_sort;
@@ -202,17 +206,19 @@ class HemisphereSampler(SimpleSampler):
         target_grid = final_target_grid))
     return new_solutions
 
-def hemisphere_shortcut(ai,characteristic_sampling,max_cell):
+def hemisphere_shortcut(ai,characteristic_sampling,max_cell,march2020_bugfix=True):
     H = HemisphereSampler(
       max_grid = 0.029,
       characteristic_grid = characteristic_sampling,
-      quick_grid = 0.016) # all grid parameters in radians
+      quick_grid = 0.016, # all grid parameters in radians
+      march2020_bugfix = march2020_bugfix)
     H.hemisphere(ai,max_cell,size=30,cutoff_divisor=4.)
-def hemisphere_refine_shortcut(ai,characteristic_sampling,unrefined):
+def hemisphere_refine_shortcut(ai,characteristic_sampling,unrefined,march2020_bugfix=True):
     H = HemisphereSampler(
       max_grid = 0.029,
       characteristic_grid = characteristic_sampling,
-      quick_grid = 0.016) # all grid parameters in radians
+      quick_grid = 0.016, # all grid parameters in radians
+      march2020_bugfix = march2020_bugfix)
     cutoff_divisor=4.
     H.kval_cutoff = ai.getXyzSize()/cutoff_divisor;
     return H.refine_top_solutions_by_grid_search(unrefined,ai)

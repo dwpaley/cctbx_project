@@ -13,7 +13,7 @@ import boost.python
 class _():
 
   def index(self, raw_spot_input=None, reciprocal_space_vectors=None,
-            panel_addresses=None):
+            panel_addresses=None, march2020_bugfix=True):
     assert [raw_spot_input, reciprocal_space_vectors].count(None) == 1
     self.raw_spot_input = raw_spot_input # deprecate record
     # must be x, y, phi in degrees, as a vec3_double
@@ -54,7 +54,8 @@ class _():
 
     hemisphere_shortcut(ai = self, # extended API
         characteristic_sampling = self.recommended_grid_sampling_rad,
-        max_cell = self.max_cell
+        max_cell = self.max_cell,
+        march2020_bugfix = march2020_bugfix
       )
 
   def sum_score_detail(self,reciprocal_space_vectors):
