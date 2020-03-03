@@ -359,6 +359,34 @@ namespace boost_python {
     }
   };
 
+  struct asu_fdp_parameter_wrapper
+  {
+    typedef asu_fdp_parameter wt;
+
+    static void wrap() {
+      using namespace boost::python;
+      class_<wt,
+             bases<scalar_parameter, single_asu_scatterer_parameter>,
+             boost::noncopyable>("asu_fdp_parameter", no_init)
+        ;
+    }
+  };
+
+  struct independent_fdp_parameter_wrapper
+  {
+    typedef independent_fdp_parameter wt;
+
+    static void wrap() {
+      using namespace boost::python;
+      class_<wt,
+             bases<asu_fdp_parameter>,
+             std::auto_ptr<wt> >("independent_fdp_parameter", no_init)
+        .def(init<asu_parameter::scatterer_type *>(arg("scatterer")))
+        ;
+      implicitly_convertible<std::auto_ptr<wt>, std::auto_ptr<parameter> >();
+    }
+  };
+
   struct asu_u_iso_parameter_wrapper
   {
     typedef asu_u_iso_parameter wt;
@@ -519,6 +547,9 @@ namespace boost_python {
 
     asu_fp_parameter_wrapper::wrap();
     independent_fp_parameter_wrapper::wrap();
+
+    asu_fdp_parameter_wrapper::wrap();
+    independent_fdp_parameter_wrapper::wrap();
 
     asu_u_iso_parameter_wrapper::wrap();
     independent_u_iso_parameter_wrapper::wrap();

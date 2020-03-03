@@ -116,7 +116,10 @@ def run(filenames, options):
   s0=xm.xray_structure.scatterers()[0]
   s0.flags.set_use_fp_fdp(True)
   s0.flags.set_grad_fp(True)
+  s0.flags.set_grad_fdp(True)
+  s0.fdp=1
   print("s0 fp: {}".format(s0.fp))
+  print("s0 fdp: {}".format(s0.fdp))
   #import ipdb
   #ipdb.set_trace()
   #s0.flags.set_grad_fdp(True)
@@ -139,6 +142,7 @@ def run(filenames, options):
   cov = ls.covariance_matrix_and_annotations()
   print("Covariance matrix building: %.3f" % (current_time() - t0))
   print("s0 fp: {}".format(s0.fp))
+  print("s0 fdp: {}".format(s0.fdp))
 
   # Write result to disk
   if out_ext != '.cif':

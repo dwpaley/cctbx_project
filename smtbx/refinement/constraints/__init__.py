@@ -187,6 +187,7 @@ class reparametrisation(ext.reparametrisation):
       self.add_new_thermal_displacement_parameter(i_sc)
       self.add_new_occupancy_parameter(i_sc)
       self.add_new_fp_parameter(i_sc)
+      self.add_new_fdp_parameter(i_sc)
     if self.twin_fractions is not None:
       for fraction in self.twin_fractions:
         if fraction.grad:
@@ -258,6 +259,14 @@ class reparametrisation(ext.reparametrisation):
       fp = self.add(independent_fp_parameter, sc)
       self.asu_scatterer_parameters[i_sc].fp = fp
     return fp
+
+  def add_new_fdp_parameter(self, i_sc):
+    fdp = self.asu_scatterer_parameters[i_sc].fdp
+    if fdp is None:
+      sc = self.structure.scatterers()[i_sc]
+      fdp = self.add(independent_fdp_parameter, sc)
+      self.asu_scatterer_parameters[i_sc].fdp = fdp
+    return fdp
 
   def add_new_site_parameter(self, i_scatterer, symm_op=None):
     if i_scatterer in self.shared_sites:

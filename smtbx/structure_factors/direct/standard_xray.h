@@ -440,6 +440,10 @@ namespace smtbx { namespace structure_factors { namespace direct {
         if (scatterer.flags.use_fp_fdp() && scatterer.flags.grad_fp()) {
           grad_fp = structure_factor_over_ff;
         }
+        if (scatterer.flags.use_fp_fdp() && scatterer.flags.grad_fdp()) {
+          scitbx::math::imaginary_unit_t i;
+          grad_fdp = i * structure_factor_over_ff;
+        }
       }
     };
 

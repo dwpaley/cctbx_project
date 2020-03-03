@@ -197,6 +197,35 @@ namespace smtbx { namespace refinement { namespace constraints {
               sparse_matrix_type *jacobian_transpose)
   {}
 
+  // fdp
+
+  void asu_fdp_parameter::set_variable(bool f) {
+    scatterer->flags.set_grad_fdp(f);
+  }
+
+  bool asu_fdp_parameter::is_variable() const {
+    return scatterer->flags.grad_fdp();
+  }
+
+  void asu_fdp_parameter
+  ::write_component_annotations_for(scatterer_type const *scatterer,
+                                    std::ostream &output) const
+  {
+    if (scatterer == this->scatterer) output << scatterer->label << ".fdp,";
+  }
+  void asu_fdp_parameter::store(uctbx::unit_cell const &unit_cell) const {
+    scatterer->fdp = value;
+  }
+  void asu_fdp_parameter::validate() 
+  {}
+
+  // independent fdp
+
+  void independent_fdp_parameter
+  ::linearise(uctbx::unit_cell const &unit_cell,
+              sparse_matrix_type *jacobian_transpose)
+  {}
+
   // u_iso
 
   void asu_u_iso_parameter::set_variable(bool f) {
