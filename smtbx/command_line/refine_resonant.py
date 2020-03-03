@@ -15,6 +15,11 @@ class command_line_error(RuntimeError): pass
 class number_of_arguments_error(command_line_error): pass
 
 def run(filenames, options):
+
+  # Check anomalous atom
+  if not options.anom_atom:
+    raise command_line_error("Must provide an anomalous atom type")
+
   #interpret file names
   if not 1 <= len(filenames) <= 3:
     raise number_of_arguments_error()
@@ -44,7 +49,7 @@ def run(filenames, options):
   else:
     out_root, out_ext = os.path.splitext(output_filename)
 
-  # ...and handle the hkl format specifiers requested by 
+  # ...and handle the hkl format specifiers requested by
   # iotbx.reflection_file_reader
   if "=amplitudes" in reflections_filename:
     reflections_realfilename = \
@@ -98,48 +103,18 @@ def run(filenames, options):
   print("%i reflections" % len(xm.fo_sq.indices))
 
   # At last...
+  anom_sc_list=[]
   for sc in xm.xray_structure.scatterers():
-    sc.flags.set_grad_site(True)
-    if sc.flags.use_u_iso(): sc.flags.set_grad_u_iso(True)
-    if sc.flags.use_u_aniso(): sc.flags.set_grad_u_aniso(True)
-    #trying to refine only occupancy of first atom...
-    #sc.flags.set_use(False)
-    #sc.flags.set_use_u_iso(False)
-    #sc.flags.set_use_u_aniso(False)
-    #sc.flags.set_grad_site(False)
-    #sc.flags.set_grad_u_iso(False)
-    #sc.flags.set_grad_u_aniso(False)
-    #sc.flags.set_grad_site(False)
-    #print(sc.flags.use_fp_fdp())
-  #trying to refine only occupancy of first atom...
+    sc.flags.set_grad_site(False)
+    sc.flags.set_grad_u_iso(False)
+    sc.flags.set_grad_u_aniso(False)
+    if sc.element_symbol().lower() == options.anom_atom.lower():
+      sc.flags.set_use_fp_fdp(True)
+      sc.flags.set_grad_fp(True)
+      sc.flags.set_grad_fdp(True)
+      anom_sc_list.append(sc)
+      print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
 
-  s0=xm.xray_structure.scatterers()[0]
-  s0.flags.set_use_fp_fdp(True)
-  s0.flags.set_grad_fp(True)
-  s0.flags.set_grad_fdp(True)
-  s0.fdp=1
-  s1=xm.xray_structure.scatterers()[1]
-  s1.flags.set_use_fp_fdp(True)
-  s1.flags.set_grad_fp(True)
-  s1.flags.set_grad_fdp(True)
-  s1.fdp=1
-  s2=xm.xray_structure.scatterers()[2]
-  s2.flags.set_use_fp_fdp(True)
-  s2.flags.set_grad_fp(True)
-  s2.flags.set_grad_fdp(True)
-  s2.fdp=1
-  print("s0 fp: {}".format(s0.fp))
-  print("s0 fdp: {}".format(s0.fdp))
-  print("s1 fp: {}".format(s1.fp))
-  print("s1 fdp: {}".format(s1.fdp))
-  print("s2 fp: {}".format(s2.fp))
-  print("s2 fdp: {}".format(s2.fdp))
-  #import ipdb
-  #ipdb.set_trace()
-  #s0.flags.set_grad_fdp(True)
-  #print()
-  #for sc in xm.xray_structure.scatterers():
-    #print(sc.flags.use_fp_fdp())
   ls = xm.least_squares()
   print("%i atoms" % len(ls.reparametrisation.structure.scatterers()))
   print("%i refined parameters" % ls.reparametrisation.n_independents)
@@ -155,12 +130,10 @@ def run(filenames, options):
   t0 = current_time()
   cov = ls.covariance_matrix_and_annotations()
   print("Covariance matrix building: %.3f" % (current_time() - t0))
-  print("s0 fp: {}".format(s0.fp))
-  print("s0 fdp: {}".format(s0.fdp))
-  print("s1 fp: {}".format(s1.fp))
-  print("s1 fdp: {}".format(s1.fdp))
-  print("s2 fp: {}".format(s2.fp))
-  print("s2 fdp: {}".format(s2.fdp))
+
+  for sc in anom_sc_list:
+    print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
+
 
   # Write result to disk
   if out_ext != '.cif':
@@ -222,6 +195,11 @@ if __name__ == '__main__':
     '--profile',
     action='store_true',
     help='Run with a profiler to find hotspots (for the author-eyes mostly!)')
+  parser.add_option(
+    '--anom-atom',
+    type='str',
+    default=None,
+    help='Refine f\' and f" for this atom type')
   options, args = parser.parse_args()
   try:
     if not options.profile:
