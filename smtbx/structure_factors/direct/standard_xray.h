@@ -276,6 +276,9 @@ namespace smtbx { namespace structure_factors { namespace direct {
         // Scattering factor
         FormFactorType ff_iso = ff * f_iso;
 
+        // Save this for calculating grad_fp and grad_fdp
+        complex_type structure_factor_over_ff = structure_factor * f_iso;
+
         // Finish
         structure_factor *= ff_iso;
 
@@ -289,6 +292,13 @@ namespace smtbx { namespace structure_factors { namespace direct {
         }
         if (scatterer.flags.grad_u_aniso()) {
           for (int j=0; j<6; ++j) grad_u_star[j] *= ff_iso;
+        }
+        if (scatterer.flags.use_fp_fdp() && scatterer.flags.grad_fp()) {
+          grad_fp = structure_factor_over_ff;
+        }
+        if (scatterer.flags.use_fp_fdp() && scatterer.flags.grad_fdp()) {
+          scitbx::math::imaginary_unit_t i;
+          grad_fdp = i * structure_factor_over_ff;
         }
       }
     };
