@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function
-# LIBTBX_SET_DISPATCHER_NAME smtbx.refine
+# LIBTBX_SET_DISPATCHER_NAME smtbx.anom_refine
 
 import os
 from scitbx import lstbx
