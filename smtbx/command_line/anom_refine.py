@@ -40,42 +40,22 @@ def run(filenames, options):
   if not in_ext: in_ext = '.ins'
   if reflections_filename is None:
     reflections_filename = in_root + '.hkl'
-  if output_filename is None:
-    if in_ext == '.ins':
-      out_root, out_ext = in_root, '.res'
-    else:
-      out_root, out_ext = in_root + '-out', in_ext
-    output_filename = out_root + out_ext
-  else:
+  if in_ext == '.cif':
+    reflections_filename += '=hklf4'
+  if output_filename:
     out_root, out_ext = os.path.splitext(output_filename)
-
-  # ...and handle the hkl format specifiers requested by
-  # iotbx.reflection_file_reader
-  if "=amplitudes" in reflections_filename:
-    reflections_realfilename = \
-        reflections_filename[:reflections_filename.find("=amplitudes")]
-  elif "=hklf3" in reflections_filename:
-    reflections_realfilename = \
-        reflections_filename[:reflections_filename.find("=hklf3")]
-  elif "=intensities" in reflections_filename:
-    reflections_realfilename = \
-        reflections_filename[:reflections_filename.find("=intensities")]
-  elif "=hklf4" in reflections_filename:
-    reflections_realfilename = \
-        reflections_filename[:reflections_filename.find("=hklf4")]
-  else:
-    reflections_realfilename = reflections_filename
+  else: out_root, out_ext = None, None
 
   # check extensions are supported
   for ext in (in_ext, out_ext):
-    if ext not in allowed_input_file_extensions:
+    if ext and ext not in allowed_input_file_extensions:
       raise command_line_error("unsupported extension: %s" % ext)
 
   # Investigate whether input and ouput files do exist, are the same, etc
-  for filename in (input_filename, reflections_realfilename):
+  for filename in (input_filename, reflections_filename):
     if not os.path.isfile(filename):
       raise command_line_error("No such file %s" % filename)
-  if os.path.isfile(output_filename):
+  if output_filename and os.path.isfile(output_filename):
     if not options.overwrite:
       raise command_line_error(
         "refuse to overwrite file %s (use option 'overwrite' to force it)"
@@ -97,10 +77,9 @@ def run(filenames, options):
 
   sgi = xm.xray_structure.space_group_info()
   sg = sgi.group()
-  print("Space group: %s" % sgi.type().hall_symbol())
-  print("\t* %scentric" % ('non-','')[sg.is_centric()])
-  print("\t* %schiral" % ('a','')[sg.is_chiral()])
-  print("%i reflections" % len(xm.fo_sq.indices))
+  if not options.table:
+    print("\n### REFINE ANOMALOUS SCATTERING FACTORS ###")
+    print("Reflections: {}\n".format(reflections_filename))
 
   # At last...
   anom_sc_list=[]
@@ -113,33 +92,47 @@ def run(filenames, options):
       sc.flags.set_grad_fp(True)
       sc.flags.set_grad_fdp(True)
       anom_sc_list.append(sc)
-      print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
+      if False:
+        print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
 
   ls = xm.least_squares()
-  print("%i atoms" % len(ls.reparametrisation.structure.scatterers()))
-  print("%i refined parameters" % ls.reparametrisation.n_independents)
+  if False:
+    print("%i atoms" % len(ls.reparametrisation.structure.scatterers()))
+    print("%i refined parameters" % ls.reparametrisation.n_independents)
   steps = lstbx.normal_eqns_solving.naive_iterations(
     non_linear_ls=ls,
     n_max_iterations=options.max_cycles,
     gradient_threshold=options.stop_if_max_derivative_below,
     step_threshold=options.stop_if_shift_norm_below)
-  print("Normal equations building time: %.3f s" % \
-        steps.non_linear_ls.normal_equations_building_time)
-  print("Normal equations solving time: %.3f s" % \
-        steps.non_linear_ls.normal_equations_solving_time)
   t0 = current_time()
   cov = ls.covariance_matrix_and_annotations()
-  print("Covariance matrix building: %.3f" % (current_time() - t0))
 
-  for sc in anom_sc_list:
-    print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
+  if options.table:
+    if options.e_in_fname:
+      estart,elength = options.e_in_fname.split(',')
+      estart = int(estart)
+      elength = int(elength)
+      e = reflections_filename[estart:estart+elength]
+    else:
+      e = reflections_filename[:reflections_filename.find('.')]
+    print(e, end=' ')
+    for sc in anom_sc_list:
+      print("{:.3f}".format(sc.fp), end=' ')
+    for sc in anom_sc_list:
+      print("{:.3f}".format(sc.fdp), end=' ')
+    print()
+
+  else:
+    for sc in anom_sc_list:
+      print("{}:\n\tfp: {}\n\tfdp: {}".format(sc.label, sc.fp, sc.fdp))
 
 
   # Write result to disk
-  if out_ext != '.cif':
-    raise NotImplementedError("Write refined structure to %s file" % out_ext)
-  with open(output_filename, 'w') as out:
-    xm.xray_structure.as_cif_simple(out, format="corecif")
+  if output_filename:
+    if out_ext != '.cif':
+      raise NotImplementedError("Write refined structure to %s file" % out_ext)
+    with open(output_filename, 'w') as out:
+      xm.xray_structure.as_cif_simple(out, format="corecif")
 
 here_usage="""\
 refine [options] INPUT
@@ -188,7 +181,7 @@ if __name__ == '__main__':
   parser.add_option(
     '--max-cycles',
     type='int',
-    default=8,
+    default=100,
     help='Stop refinement as soon as the given number of cycles have been '
          'performed')
   parser.add_option(
@@ -196,10 +189,19 @@ if __name__ == '__main__':
     action='store_true',
     help='Run with a profiler to find hotspots (for the author-eyes mostly!)')
   parser.add_option(
+    '--table',
+    action='store_true',
+    help='Output in condensed format suitable for further processing')
+  parser.add_option(
     '--anom-atom',
     type='str',
     default=None,
     help='Refine f\' and f" for this atom type')
+  parser.add_option(
+    '--e-in-fname',
+    type='str',
+    default=None,
+    help='First digit and length of energy in hkl filename. Format start,length')
   options, args = parser.parse_args()
   try:
     if not options.profile:
@@ -218,4 +220,5 @@ if __name__ == '__main__':
     parser.print_help()
     sys.exit(1)
   t1 = current_time()
-  print("Total time: %.3f s" % (t1 - t0))
+  if not options.table:
+    print("Total time: %.3f s" % (t1 - t0))
