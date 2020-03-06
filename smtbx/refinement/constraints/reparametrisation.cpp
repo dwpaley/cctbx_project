@@ -216,8 +216,9 @@ namespace smtbx { namespace refinement { namespace constraints {
   void asu_fdp_parameter::store(uctbx::unit_cell const &unit_cell) const {
     scatterer->fdp = value;
   }
-  void asu_fdp_parameter::validate() 
-  {}
+  void asu_fdp_parameter::validate() {
+    if (value < 0) value *= -1;
+  }
 
   // independent fdp
 
