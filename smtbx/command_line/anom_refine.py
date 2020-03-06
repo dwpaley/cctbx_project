@@ -40,8 +40,6 @@ def run(filenames, options):
   if not in_ext: in_ext = '.ins'
   if reflections_filename is None:
     reflections_filename = in_root + '.hkl'
-  if in_ext == '.cif':
-    reflections_filename += '=hklf4'
   if output_filename:
     out_root, out_ext = os.path.splitext(output_filename)
   else: out_root, out_ext = None, None
@@ -64,7 +62,7 @@ def run(filenames, options):
   # Load input model and reflections
   if in_ext == '.cif':
     xm = refinement.model.from_cif(model=input_filename,
-                                   reflections=reflections_filename)
+                                   reflections=reflections_filename + '=hklf4')
   else:
     xm = refinement.model.from_shelx(ins_or_res=input_filename,
                                      hkl=reflections_filename,
