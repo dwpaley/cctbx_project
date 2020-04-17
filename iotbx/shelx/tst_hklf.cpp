@@ -13,6 +13,7 @@ class test_case1 {
     typedef scitbx::sym_mat3<double> sym_mat3_t;
 
     void run() {
+      /*
       std::cout<<"########################################"<<std::endl;
       vec3_t a(1,2,3);
       vec3_t b(4,5,6);
@@ -31,6 +32,7 @@ class test_case1 {
       out = iotbx::shelx::hklf_reader::make_perpendicular(a, b, g);
       IOTBX_ASSERT(scitbx::math::approx_equal_absolutely<double>(1e-12)(0, a*g*out));
       IOTBX_ASSERT(scitbx::math::approx_equal_absolutely<double>(1e-12)(0, b*g*out));
+      */
 
     }
 };
