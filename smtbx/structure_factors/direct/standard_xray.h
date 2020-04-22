@@ -882,6 +882,17 @@ namespace smtbx { namespace structure_factors { namespace direct {
         compute(h, f_mask, false);
       }
 
+      void evaluate(miller::index<> const &h,
+                    pol_vec_type u_inc,
+                    pol_vec_type u_scat,
+                    pol_vec_type v_scat,
+                    float_type pol_factor,
+                    boost::optional<complex_type> const &f_mask=boost::none)
+      {
+        compute(h, u_inc, u_scat, v_scat, pol_factor, f_mask, false);
+      }
+
+
       /// Linearise the structure factors
       void linearise(miller::index<> const &h,
                      boost::optional<complex_type> const &f_mask=boost::none)
@@ -1325,6 +1336,21 @@ namespace smtbx { namespace structure_factors { namespace direct {
             }
           }
         }
+      }
+
+      // The following overload has to exist so Boost will compile, but it is
+      // not implemented.
+      static
+      void compute(bool origin_centric_case,
+                   complex_type f_calc,
+                   af::const_ref<complex_type> const &grad_f_calc,
+                   complex_type f_calc_prime,
+                   af::const_ref<complex_type> const &grad_f_calc_prime,
+                   float_type &observable,
+                   af::ref<float_type> const &grad_observable,
+                   bool compute_grad)
+      {
+        SMTBX_ASSERT(0);
       }
     };
   } // namespace one_h

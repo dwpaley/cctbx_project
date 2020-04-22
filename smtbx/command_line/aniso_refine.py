@@ -83,6 +83,12 @@ start,length.'''
     default=1e-7,
     help='Stop refinement as soon as the Euclidean norm of the vector '
          'of parameter shifts is below the given threshold.')
+  parser.add_argument(
+    '-p', '--proj',
+    type=int,
+    default=None,
+    help='For testing: specify the projections of f\' and f" tensors to output.'
+         ' Current choices are 1: monoCO, Co atoms; 2: monoCOplus, Co atoms')
   return parser
 
 def run(args):
@@ -152,35 +158,109 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
     n_max_iterations=args.max_cycles,
     gradient_threshold=args.stop_deriv,
     step_threshold=args.stop_shift)
-  print(ls.r1_factor())
+  from sys import stderr
+  sys.stderr.write(str(ls.r1_factor()))
+  sys.stderr.write("\n")
 
-  import ipdb
-  ipdb.set_trace()
+  def fp_proj(sc, vec, uc):
+    import numpy as np
+    from math import sqrt
+    u = np.array(vec)
+    g_elem = uc.metrical_matrix()
+    g = np.array([
+        [g_elem[0], g_elem[3], g_elem[4]],
+        [g_elem[3], g_elem[1], g_elem[5]],
+        [g_elem[4], g_elem[5], g_elem[2]]])
+    g_star = np.linalg.inv(g)
+    h = np.dot(u, g)
+    h_len = sqrt(np.dot(h, np.dot(g_star, h)))
+    h = h/h_len
+
+    fp_star_elem = sc.fp_star
+    fp_star = np.array([
+        [fp_star_elem[0], fp_star_elem[3], fp_star_elem[4]],
+        [fp_star_elem[3], fp_star_elem[1], fp_star_elem[5]],
+        [fp_star_elem[4], fp_star_elem[5], fp_star_elem[2]]])
+
+    return np.dot(h, np.dot(fp_star, h))
+
+  def fdp_proj(sc, vec, uc):
+    import numpy as np
+    from math import sqrt
+    u = np.array(vec)
+    g_elem = uc.metrical_matrix()
+    g = np.array([
+        [g_elem[0], g_elem[3], g_elem[4]],
+        [g_elem[3], g_elem[1], g_elem[5]],
+        [g_elem[4], g_elem[5], g_elem[2]]])
+    g_star = np.linalg.inv(g)
+    h = np.dot(u, g)
+    h_len = sqrt(np.dot(h, np.dot(g_star, h)))
+    h = h/h_len
+
+    fdp_star_elem = sc.fdp_star
+    fdp_star = np.array([
+        [fdp_star_elem[0], fdp_star_elem[3], fdp_star_elem[4]],
+        [fdp_star_elem[3], fdp_star_elem[1], fdp_star_elem[5]],
+        [fdp_star_elem[4], fdp_star_elem[5], fdp_star_elem[2]]])
+
+    return np.dot(h, np.dot(fdp_star, h))
+
+
+
   # Prepare output
   result = ''
 
   from cctbx import adptbx
   uc = xm.xray_structure.unit_cell()
-  for sc in anom_sc_list:
-    fp_cif = adptbx.u_star_as_u_cif(uc, sc.fp_star)
-    fp_s = [x * -.01 for x in fp_cif]
-    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
+#  The following takes the anomalous atoms and writes them in ShelXL format but
+#  with their f' and f" tensors (suitably scaled) taking the place of ADPs.
+#  The output lines can be copied into a .res file for viewing.
+#
+#  for sc in anom_sc_list:
+#    fp_cif = adptbx.u_star_as_u_cif(uc, sc.fp_star)
+#    fp_s = [x * -.01 for x in fp_cif]
+#    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+#      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
+#
+#  for sc in anom_sc_list:
+#    fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
+#    fdp_s = [x * .02 for x in fdp_cif]
+#    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+#      sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
+#
 
-  for sc in anom_sc_list:
-    fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
-    fdp_s = [x * .02 for x in fdp_cif]
-    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-      sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
+  # Directions (in crystal coordinates) on which f' and f" tensors will be
+  # projected for output. Only for testing. These all give a projection on a
+  # line through the center of the Co6 cluster.
+  ProjectionUvwDict = {
+  #For monoCO, Co
+  1:  [
+      ( .124, .150, .142),
+      ( .014,-.152, .157),
+      (-.269, .058, .046),
+      ( .014,-.152, .157),
+      (-.269, .058, .046),
+      ( .124, .150, .142)],
 
+  #for monoCOplus, Co
+  2:  [
+      ( .139, .073, .199),
+      ( .304, .053,-.149),
+      ( .115,-.248, .033),
+      ( .304, .053,-.149),
+      ( .115,-.248, .033),
+      ( .139, .073, .199)]
+  }
 
   if args.table:
+    vecs = ProjectionUvwDict[args.proj]
     if energy: result += "{:.1f} ".format(energy)
     else: result += "{} ".format(args.reflections)
-    for sc in anom_sc_list:
-      result += "{:.3f} ".format(sc.fp)
-    for sc in anom_sc_list:
-      result += "{:.3f} ".format(sc.fdp)
+    for i_sc in range(6):
+      result += "{:.3f} ".format(fp_proj(anom_sc_list[i_sc], vecs[i_sc], uc))
+    for i_sc in range(6):
+      result += "{:.3f} ".format(fdp_proj(anom_sc_list[i_sc], vecs[i_sc], uc))
     result += '\n'
 
   else:
@@ -195,6 +275,7 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       f.write(result)
   else:
     print(result)
+
 
 
 

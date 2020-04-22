@@ -18,6 +18,17 @@ namespace smtbx { namespace structure_factors { namespace direct {
         self.evaluate(h);
       }
 
+      static void evaluate_with_pol_vecs(wt &self,
+                                         miller::index<> const &h,
+                                         miller::index<double> const &u_inc,
+                                         miller::index<double> const &u_scat,
+                                         miller::index<double> const &v_scat,
+                                         double pol_factor)
+      {
+        self.evaluate(h, u_inc, u_scat, v_scat, pol_factor);
+      }
+
+
       static void linearise(wt &self, miller::index<> const &h) {
         self.linearise(h);
       }
@@ -48,6 +59,7 @@ namespace smtbx { namespace structure_factors { namespace direct {
         using namespace boost::python;
         (*this)
           .def("evaluate" , evaluate , args("miller_index"))
+          .def("evaluate" , evaluate_with_pol_vecs)
           .def("linearise", linearise, args("miller_index"))
           .add_property("f_calc", f_calc)
           .add_property("observable", observable)
