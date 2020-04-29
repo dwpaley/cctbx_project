@@ -32,6 +32,7 @@ namespace cctbx { namespace adp_restraints {
       init_deltas(params.u_cart[proxy.i_seqs[0]]);
     }
 
+    virtual
     void linearise(
       uctbx::unit_cell const &unit_cell,
       restraints::linearised_eqns_of_restraint<double> &linearised_eqns,
@@ -66,6 +67,85 @@ namespace cctbx { namespace adp_restraints {
       double const u_iso = adptbx::u_cart_as_u_iso(u_cart);
       for (int i=0; i<6; i++)
         deltas_[i] = (i < 3 ? u_cart[i] - u_iso : u_cart[i]);
+    }
+
+  };
+
+
+  // Polarization-anisotropic fp and fdp tensors have the same form as aadp
+  // tensors, so their restraints also look very similar and can use most of
+  // the same code.
+  struct isotropic_fp_proxy : public isotropic_adp_proxy {
+    isotropic_fp_proxy() {}
+    isotropic_fp_proxy(af::tiny<unsigned, 1> const &i_seqs_,
+      double weight_)
+    : isotropic_adp_proxy(i_seqs_, weight_)
+    {}
+  
+  };
+
+  class isotropic_fp : public isotropic_adp {
+  public:
+    isotropic_fp(
+      scitbx::sym_mat3<double> const &fp_cart,
+      double weight)
+    : isotropic_adp(fp_cart, weight)
+    {}
+
+    // When this is constructed, it should receive an adp_restraint_params
+    // object holding fp_cart values in its u_cart data member.
+    isotropic_fp(
+      adp_restraint_params<double> const &params,
+      isotropic_adp_proxy const &proxy)
+    : isotropic_adp(params, proxy)
+    {}
+
+    void linearise(
+      uctbx::unit_cell const &unit_cell,
+      restraints::linearised_eqns_of_restraint<double> &linearised_eqns,
+      xray::parameter_map<cctbx::xray::scatterer<double> > const &parameter_map,
+      af::tiny<unsigned, 1> const &i_seqs)
+    {
+      linearise_1<isotropic_adp>(
+        unit_cell, linearised_eqns, parameter_map, i_seqs[0], true, weight,
+        deltas_.begin(), true, false);
+    }
+
+  };
+
+  struct isotropic_fdp_proxy : public isotropic_adp_proxy {
+    isotropic_fdp_proxy() {}
+    isotropic_fdp_proxy(af::tiny<unsigned, 1> const &i_seqs_,
+      double weight_)
+    : isotropic_adp_proxy(i_seqs_, weight_)
+    {}
+  };
+
+  class isotropic_fdp : public isotropic_adp {
+  public:
+    isotropic_fdp(
+      scitbx::sym_mat3<double> const &fdp_cart,
+      double weight)
+    : isotropic_adp(fdp_cart, weight)
+    {}
+
+    // When this is constructed, it should receive an adp_restraint_params
+    // object holding fdp_cart values in its u_cart data member.
+    isotropic_fdp(
+      adp_restraint_params<double> const &params,
+      isotropic_adp_proxy const &proxy)
+    : isotropic_adp(params, proxy)
+    {}
+
+    void linearise(
+      uctbx::unit_cell const &unit_cell,
+      restraints::linearised_eqns_of_restraint<double> &linearised_eqns,
+      xray::parameter_map<cctbx::xray::scatterer<double> > const &parameter_map,
+      af::tiny<unsigned, 1> const &i_seqs)
+    {
+      linearise_1<isotropic_adp>(
+        unit_cell, linearised_eqns, parameter_map, i_seqs[0], true, weight,
+        deltas_.begin(), false, true);
     }
 
   };

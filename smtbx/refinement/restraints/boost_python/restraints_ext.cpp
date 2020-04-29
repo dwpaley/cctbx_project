@@ -173,6 +173,15 @@ namespace boost_python {
       double, cctbx::adp_restraints::adp_restraint_params,
       adp_res::adp_volume_similarity_proxy, adp_res::adp_volume_similarity>::wrap();
 
+    // fp, fdp restraints
+    linearise_restraints_with_parameter_map_and_extra_parameters<
+      double, cctbx::adp_restraints::adp_restraint_params,
+      adp_res::isotropic_fp_proxy, adp_res::isotropic_fp>::wrap();
+
+    linearise_restraints_with_parameter_map_and_extra_parameters<
+      double, cctbx::adp_restraints::adp_restraint_params,
+      adp_res::isotropic_fdp_proxy, adp_res::isotropic_fdp>::wrap();
+
   }
 
   void wrap_origin_fixing_restraints();

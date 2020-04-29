@@ -488,6 +488,40 @@ namespace cctbx { namespace xray { namespace {
     return result;
   }
 
+  af::shared<scitbx::sym_mat3<double> >
+  extract_fp_cart(
+    af::const_ref<scatterer<> > const& self,
+    uctbx::unit_cell const& unit_cell)
+  {
+    af::shared<scitbx::sym_mat3<double> > result(af::reserve(self.size()));
+    for(std::size_t i=0;i<self.size();i++) {
+      if(self[i].fp_star != scitbx::sym_mat3<double>(-1,-1,-1,-1,-1,-1)) {
+        result.push_back(adptbx::u_star_as_u_cart(unit_cell, self[i].fp_star));
+      }
+      else {
+        result.push_back(scitbx::sym_mat3<double>(-1,-1,-1,-1,-1,-1));
+      }
+    }
+    return result;
+  }
+
+  af::shared<scitbx::sym_mat3<double> >
+  extract_fdp_cart(
+    af::const_ref<scatterer<> > const& self,
+    uctbx::unit_cell const& unit_cell)
+  {
+    af::shared<scitbx::sym_mat3<double> > result(af::reserve(self.size()));
+    for(std::size_t i=0;i<self.size();i++) {
+      if(self[i].fdp_star != scitbx::sym_mat3<double>(-1,-1,-1,-1,-1,-1)) {
+        result.push_back(adptbx::u_star_as_u_cart(unit_cell, self[i].fdp_star));
+      }
+      else {
+        result.push_back(scitbx::sym_mat3<double>(-1,-1,-1,-1,-1,-1));
+      }
+    }
+    return result;
+  }
+
   af::shared<bool>
   extract_use_u_iso(
     af::const_ref<scatterer<> > const& self)
@@ -506,6 +540,17 @@ namespace cctbx { namespace xray { namespace {
     af::shared<bool> result(af::reserve(self.size()));
     for(std::size_t i=0;i<self.size();i++) {
       result.push_back(self[i].flags.use_u_aniso());
+    }
+    return result;
+  }
+
+  af::shared<bool>
+  extract_use_fp_fdp_aniso(
+    af::const_ref<scatterer<> > const& self)
+  {
+    af::shared<bool> result(af::reserve(self.size()));
+    for(std::size_t i=0;i<self.size();i++) {
+      result.push_back(self[i].flags.use_fp_fdp_aniso());
     }
     return result;
   }
@@ -709,6 +754,7 @@ namespace scitbx { namespace af { namespace boost_python {
       .def("extract_u_iso", cctbx::xray::extract_u_iso)
       .def("extract_use_u_iso", cctbx::xray::extract_use_u_iso)
       .def("extract_use_u_aniso", cctbx::xray::extract_use_u_aniso)
+      .def("extract_use_fp_fdp_aniso", cctbx::xray::extract_use_fp_fdp_aniso)
       .def("extract_u_iso_or_u_equiv", cctbx::xray::extract_u_iso_or_u_equiv,
         (arg("unit_cell")))
       .def("extract_u_cart_plus_u_iso", cctbx::xray::extract_u_cart_plus_u_iso,
@@ -725,6 +771,10 @@ namespace scitbx { namespace af { namespace boost_python {
       .def("set_u_star", cctbx::xray::set_u_star,
         (arg("u_star")))
       .def("extract_u_cart", cctbx::xray::extract_u_cart,
+        (arg("unit_cell")))
+      .def("extract_fp_cart", cctbx::xray::extract_fp_cart,
+        (arg("unit_cell")))
+      .def("extract_fdp_cart", cctbx::xray::extract_fdp_cart,
         (arg("unit_cell")))
       .def("set_u_cart", (void(*)(
               af::ref<cctbx::xray::scatterer<> > const&,

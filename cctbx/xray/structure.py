@@ -909,6 +909,9 @@ class structure(crystal.special_position_settings):
   def use_u_aniso(self):
     return self._scatterers.extract_use_u_aniso()
 
+  def use_fp_fdp_aniso(self):
+    return self._scatterers.extract_use_fp_fdp_aniso()
+
   def set_sites_frac(self, sites_frac):
     """Set the the fractional coordinates of all sites of the structure to \
     'sites_frac'.

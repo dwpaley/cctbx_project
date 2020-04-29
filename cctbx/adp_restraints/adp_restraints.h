@@ -74,12 +74,25 @@ namespace cctbx { namespace adp_restraints {
     unsigned i_seq,
     bool use_u_aniso,
     double weight,
-    double const *deltas)
+    double const *deltas,
+    bool use_fp_aniso=false,
+    bool use_fdp_aniso=false)
   {
     cctbx::xray::parameter_indices const &ids = parameter_map[i_seq];
+    std::size_t idx;
+    if (use_fp_aniso) {
+      CCTBX_ASSERT(!use_fdp_aniso);
+      idx = ids.fp_aniso;
+    }
+    else if (use_fdp_aniso) {
+      idx = ids.fdp_aniso;
+    }
+    else {
+      idx = ids.u_aniso;
+    }
     if (use_u_aniso) {
       // One restraint per parameter == six rows in the restraint matrix
-      CCTBX_ASSERT(ids.u_aniso != -1);
+      CCTBX_ASSERT(idx != -1);
       for (int i=0; i < GradientSource::grad_row_count(); i++) {
         std::size_t row_i = linearised_eqns.next_row();
         scitbx::sym_mat3<double> grad_u_star;
@@ -89,7 +102,7 @@ namespace cctbx { namespace adp_restraints {
           grad_u_star.begin());
         for (int j=0; j<6; j++) {
           // symmetric matrix, off-diagonals count double
-          linearised_eqns.design_matrix(row_i, ids.u_aniso+j) =
+          linearised_eqns.design_matrix(row_i, idx+j) =
             (j > 2 ? 2*grad_u_star[j] : grad_u_star[j]);
         }
         linearised_eqns.weights[row_i] = weight;

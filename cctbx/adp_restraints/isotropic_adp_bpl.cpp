@@ -42,6 +42,56 @@ namespace {
     }
   };
 
+  struct isotropic_fp_proxy_wrappers
+  {
+    typedef isotropic_fp_proxy w_t;
+
+    static void
+    wrap()
+    {
+      using namespace boost::python;
+      typedef return_value_policy<return_by_value> rbv;
+      class_<w_t, bases<isotropic_adp_proxy> >
+        ("isotropic_fp_proxy", no_init)
+        .def(init<
+           af::tiny<unsigned, 1> const &,
+           double>(
+          (arg("i_seqs"),
+           arg("weight"))))
+      ;
+      {
+        scitbx::af::boost_python::shared_wrapper<w_t>::wrap(
+          "shared_isotropic_fp_proxy")
+        ;
+      }
+    }
+  };
+
+  struct isotropic_fdp_proxy_wrappers
+  {
+    typedef isotropic_fdp_proxy w_t;
+
+    static void
+    wrap()
+    {
+      using namespace boost::python;
+      typedef return_value_policy<return_by_value> rbv;
+      class_<w_t, bases<isotropic_adp_proxy> >
+        ("isotropic_fdp_proxy", no_init)
+        .def(init<
+           af::tiny<unsigned, 1> const &,
+           double>(
+          (arg("i_seqs"),
+           arg("weight"))))
+      ;
+      {
+        scitbx::af::boost_python::shared_wrapper<w_t>::wrap(
+          "shared_isotropic_fdp_proxy")
+        ;
+      }
+    }
+  };
+
   struct isotropic_adp_wrappers
   {
     typedef isotropic_adp w_t;
@@ -66,10 +116,62 @@ namespace {
     }
   };
 
+  struct isotropic_fp_wrappers
+  {
+    typedef isotropic_fp w_t;
+
+    static void
+    wrap() {
+      using namespace boost::python;
+      typedef return_value_policy<return_by_value> rbv;
+      class_<w_t, bases<isotropic_adp> >
+            ("isotropic_fp", no_init)
+        .def(init<
+            scitbx::sym_mat3<double> const &,
+            double>(
+          (arg("u_cart"),
+           arg("weight"))))
+        .def(init<
+            adp_restraint_params<double> const &,
+            isotropic_fp_proxy const &>(
+          (arg("params"),
+           arg("proxy"))))
+      ;
+    }
+  };
+
+  struct isotropic_fdp_wrappers
+  {
+    typedef isotropic_fdp w_t;
+
+    static void
+    wrap() {
+      using namespace boost::python;
+      typedef return_value_policy<return_by_value> rbv;
+      class_<w_t, bases<isotropic_adp> >
+            ("isotropic_fdp", no_init)
+        .def(init<
+            scitbx::sym_mat3<double> const &,
+            double>(
+          (arg("u_cart"),
+           arg("weight"))))
+        .def(init<
+            adp_restraint_params<double> const &,
+            isotropic_fdp_proxy const &>(
+          (arg("params"),
+           arg("proxy"))))
+      ;
+    }
+  };
+
   void wrap_all() {
     using namespace boost::python;
     isotropic_adp_wrappers::wrap();
+    isotropic_fp_wrappers::wrap();
+    isotropic_fdp_wrappers::wrap();
     isotropic_adp_proxy_wrappers::wrap();
+    isotropic_fp_proxy_wrappers::wrap();
+    isotropic_fdp_proxy_wrappers::wrap();
   }
 
 }

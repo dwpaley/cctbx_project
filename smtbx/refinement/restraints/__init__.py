@@ -28,6 +28,8 @@ class manager(object):
   fixed_u_eq_adp_proxies=None
   adp_u_eq_similarity_proxies=None
   adp_volume_similarity_proxies=None
+  isotropic_fp_proxies=None
+  isotropic_fdp_proxies=None
 
   def __init__(self, **kwds):
     adopt_optional_init_args(self, kwds)
@@ -157,6 +159,8 @@ class manager(object):
         n_restraints += 1
       geometry_proxies.append(self.chirality_proxies)
     adp_proxies = []
+    fp_proxies = []
+    fdp_proxies = []
     if self.adp_similarity_proxies is not None:
       adp_proxies.append(self.adp_similarity_proxies)
       n_restraints += 6 * self.adp_similarity_proxies.size()
@@ -180,6 +184,12 @@ class manager(object):
     if self.rigu_proxies is not None:
       adp_proxies.append(self.rigu_proxies)
       n_restraints += 3 * self.rigu_proxies.size()
+    if self.isotropic_fp_proxies is not None:
+      fp_proxies.append(self.isotropic_fp_proxies)
+      n_restraints += 6 * self.isotropic_fp_proxies.size()
+    if self.isotropic_fdp_proxies is not None:
+      fdp_proxies.append(self.isotropic_fdp_proxies)
+      n_restraints += 6 * self.isotropic_fdp_proxies.size()
     # construct restraints matrix
     linearised_eqns = linearised_eqns_of_restraint(
       n_restraints, n_params)
@@ -198,4 +208,31 @@ class manager(object):
       linearise_restraints(
         xray_structure.unit_cell(), params,
         parameter_map, proxies, linearised_eqns)
+
+    if fp_proxies:
+      fp_cart = xray_structure.scatterers().extract_fp_cart(
+        xray_structure.unit_cell())
+      params_with_fp_aniso = adp_restraint_params(
+        sites_cart=xray_structure.sites_cart(),
+        u_cart=fp_cart,
+        u_iso=xray_structure.scatterers().extract_u_iso(),
+        use_u_aniso=xray_structure.use_fp_fdp_aniso())
+      for proxies in fp_proxies:
+        linearise_restraints(
+          xray_structure.unit_cell(), params_with_fp_aniso,
+          parameter_map, proxies, linearised_eqns)
+
+    if fdp_proxies:
+      fdp_cart = xray_structure.scatterers().extract_fdp_cart(
+        xray_structure.unit_cell())
+      params_with_fdp_aniso = adp_restraint_params(
+        sites_cart=xray_structure.sites_cart(),
+        u_cart=fdp_cart,
+        u_iso=xray_structure.scatterers().extract_u_iso(),
+        use_u_aniso=xray_structure.use_fp_fdp_aniso())
+      for proxies in fdp_proxies:
+        linearise_restraints(
+          xray_structure.unit_cell(), params_with_fdp_aniso,
+          parameter_map, proxies, linearised_eqns)
+
     return linearised_eqns
