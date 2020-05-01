@@ -29,6 +29,8 @@ struct parameter_indices_wrapper
       .def_readonly("occupancy", &wt::occupancy)
       .def_readonly("fp", &wt::fp)
       .def_readonly("fdp", &wt::fdp)
+      .def_readonly("fp_aniso", &wt::fp_aniso)
+      .def_readonly("fdp_aniso", &wt::fdp_aniso)
       ;
   }
 };
