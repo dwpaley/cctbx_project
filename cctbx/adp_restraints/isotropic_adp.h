@@ -81,7 +81,7 @@ namespace cctbx { namespace adp_restraints {
       double weight_)
     : isotropic_adp_proxy(i_seqs_, weight_)
     {}
-  
+
   };
 
   class isotropic_fp : public isotropic_adp {

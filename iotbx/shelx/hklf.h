@@ -62,7 +62,7 @@ struct vector_calculator
     vec3_t proj = v1 - vector_projection(v1, v2);
     return norm ? normalize(proj) : proj;
   }
-  
+
   vec3_t vl_to_hkl(
       vec3_t const &v_l,
       mat3_t const &UB,
@@ -325,7 +325,7 @@ class hklf_reader
 
         //compute the polarization vectors and pol factor
         vec3_t hkl_yl =
-          hkl_calculator.vl_to_hkl(vec3_t(0,1,0), UB, phi, chi, omega); 
+          hkl_calculator.vl_to_hkl(vec3_t(0,1,0), UB, phi, chi, omega);
         vec3_t u_inc = hkl_calculator.perpendicular(h_inc, hkl_yl);
         vec3_t u_scat = hkl_calculator.plane_projection(u_inc, h_scat, true);
         vec3_t v_scat = hkl_calculator.perpendicular(u_scat, h_scat);
