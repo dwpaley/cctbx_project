@@ -139,7 +139,12 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
 
   # At last...
   anom_sc_list=[]
-  for sc in xm.xray_structure.scatterers():
+  from cctbx import adp_restraints
+  xm.restraints_manager.isotropic_fp_proxies = \
+      adp_restraints.shared_isotropic_fp_proxy()
+  xm.restraints_manager.isotropic_fdp_proxies = \
+      adp_restraints.shared_isotropic_fdp_proxy()
+  for i, sc in enumerate(xm.xray_structure.scatterers()):
     sc.flags.set_grad_site(False)
     sc.flags.set_grad_u_iso(False)
     sc.flags.set_grad_u_aniso(False)
@@ -151,16 +156,20 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       sc.flags.set_grad_fp_aniso(True)
       sc.flags.set_grad_fdp_aniso(True)
       anom_sc_list.append(sc)
+      xm.restraints_manager.isotropic_fp_proxies.append(
+          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=1))
+      xm.restraints_manager.isotropic_fdp_proxies.append(
+          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=1))
 
   ls = xm.least_squares()
-  steps = lstbx.normal_eqns_solving.levenberg_marquardt_iterations(
+  steps = lstbx.normal_eqns_solving.naive_iterations(
     non_linear_ls=ls,
     n_max_iterations=args.max_cycles,
     gradient_threshold=args.stop_deriv,
     step_threshold=args.stop_shift)
-  from sys import stderr
-  sys.stderr.write(str(ls.r1_factor()))
-  sys.stderr.write("\n")
+  #from sys import stderr
+  #sys.stderr.write(str(ls.r1_factor()))
+  #sys.stderr.write("\n")
 
   def fp_proj(sc, vec, uc):
     import numpy as np
@@ -205,6 +214,28 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
         [fdp_star_elem[4], fdp_star_elem[5], fdp_star_elem[2]]])
 
     return np.dot(h, np.dot(fdp_star, h))
+
+  def print_fp_cart(sc, uc):
+    import numpy as np
+    from cctbx import adptbx
+    fp_cart_elem = adptbx.u_star_as_u_cart(uc, sc.fp_star)
+    fp_cart = np.array([
+        [fp_cart_elem[0], fp_cart_elem[3], fp_cart_elem[4]],
+        [fp_cart_elem[3], fp_cart_elem[1], fp_cart_elem[5]],
+        [fp_cart_elem[4], fp_cart_elem[5], fp_cart_elem[2]]])
+    print(fp_cart)
+
+  def print_fdp_cart(sc, uc):
+    import numpy as np
+    from cctbx import adptbx
+    fdp_cart_elem = adptbx.u_star_as_u_cart(uc, sc.fdp_star)
+    fdp_cart = np.array([
+        [fdp_cart_elem[0], fdp_cart_elem[3], fdp_cart_elem[4]],
+        [fdp_cart_elem[3], fdp_cart_elem[1], fdp_cart_elem[5]],
+        [fdp_cart_elem[4], fdp_cart_elem[5], fdp_cart_elem[2]]])
+    print(fdp_cart)
+
+
 
 
 
@@ -275,6 +306,13 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       f.write(result)
   else:
     print(result)
+    #import numpy as np
+    #with np.printoptions(precision=2, suppress=True):
+    #  for sc in anom_sc_list:
+    #    print_fp_cart(sc, uc)
+    #  print()
+    #  for sc in anom_sc_list:
+    #    print_fdp_cart(sc, uc)
 
 
 
