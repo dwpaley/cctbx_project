@@ -792,6 +792,8 @@ public:
 
   virtual void store(uctbx::unit_cell const &unit_cell) const;
 
+  virtual void validate();
+
 };
 
 class independent_fdp_star_parameter : public asu_fdp_star_parameter

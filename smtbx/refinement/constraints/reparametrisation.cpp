@@ -318,6 +318,17 @@ namespace smtbx { namespace refinement { namespace constraints {
     scatterer->fdp_star = value;
   }
 
+  // The fdp_star tensor should have positive eigenvalues because absorption
+  // coefficients are positive. This is a low-effort implementation and not
+  // really meant for release.
+  void asu_fdp_star_parameter::validate() {
+    if ((value[0] + value[1] + value[2]) < 0) {
+      for (int i=0; i<6; ++i) {
+        value[i] *= -1;
+      }
+    }
+  }
+
   // independent fdp_star
 
   void independent_fdp_star_parameter
