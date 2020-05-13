@@ -83,6 +83,11 @@ start,length.'''
     default=1e-7,
     help='Stop refinement as soon as the Euclidean norm of the vector '
          'of parameter shifts is below the given threshold.')
+  parser.add_argument(
+    '-A', '--adp_global',
+    action='store_true',
+    help='Refine a global ADP scaling parameter (an extremely simple model for'
+         'beam damage)')
   return parser
 
 def run(args):
@@ -146,12 +151,24 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       sc.flags.set_grad_fdp(True)
       anom_sc_list.append(sc)
 
+  if args.adp_global:
+    from smtbx.refinement.constraints.adp import scalar_scaled_u
+    for sc in xm.xray_structure.scatterers():
+      if sc.flags.use_u_aniso():
+        sc.flags.set_grad_u_aniso(True)
+      else:
+        sc.flags.set_grad_u_iso(True)
+    adp_scale = scalar_scaled_u(range(len(xm.xray_structure.scatterers())))
+    xm.constraints.append(adp_scale)
+
+
   ls = xm.least_squares()
   steps = lstbx.normal_eqns_solving.levenberg_marquardt_iterations(
     non_linear_ls=ls,
     n_max_iterations=args.max_cycles,
     gradient_threshold=args.stop_deriv,
     step_threshold=args.stop_shift)
+  cov_an = ls.covariance_matrix_and_annotations()
 
   # Prepare output
   result = ''
@@ -167,11 +184,38 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       result += "{:.3f} ".format(sc.fdp)
     result += '\n'
 
-  else:
+  if args.table_with_su:
+    result += ' ' * len(label)
+    for i, sc in anom_sc_list:
+      label_fp = '{}.fp'.format(sc.label)
+      sigma_fp = sqrt(cov_an.variance_of(label_fp))
+      result += "{:6.3f} ".format(sigma_fp)
+    for i, sc in anom_sc_list:
+      label_fdp = '{}.fdp'.format(sc.label)
+      sigma_fdp = sqrt(cov_an.variance_of(label_fdp))
+      result += "{:6.3f} ".format(sigma_fdp)
+    result += '\n'
+
+  if not (args.table or args.table_with_su):
+    from libtbx.utils import format_float_with_standard_uncertainty \
+        as format_float_with_su
     result += "\n### REFINE ANOMALOUS SCATTERING FACTORS ###\n"
     result += "Reflections: {}\n\n".format(args.reflections)
-    for sc in anom_sc_list:
-      result += "{}:\n\tfp: {:.3f}\n\tfdp: {:.3f}\n".format(sc.label, sc.fp, sc.fdp)
+
+    if args.adp_global:
+      sigma_adp_global = adp_scale.esd(ls)
+      result += "ADP scale: {}\n\n".format(
+          format_float_with_su(adp_scale.scalar.value, sigma_adp_global))
+
+    for i, sc in anom_sc_list:
+      label_fp = '{}.fp'.format(sc.label)
+      label_fdp = '{}.fdp'.format(sc.label)
+      sigma_fp = sqrt(cov_an.variance_of(label_fp))
+      sigma_fdp = sqrt(cov_an.variance_of(label_fdp))
+      result += "{}:\n\tfp: {}\n\tfdp: {}\n".format(
+          sc.label,
+          format_float_with_su(sc.fp, sigma_fp),
+          format_float_with_su(sc.fdp, sigma_fdp))
 
   # Write to file or stdout
   if args.outfile:
