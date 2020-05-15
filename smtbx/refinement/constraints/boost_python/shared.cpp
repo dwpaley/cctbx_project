@@ -52,44 +52,6 @@ namespace smtbx { namespace refinement { namespace constraints {
       }
     };
 
-    struct scalar_scaled_u_star_parameter_wrapper {
-      typedef scalar_scaled_u_star_parameter wt;
-
-      static void wrap() {
-        using namespace boost::python;
-        return_internal_reference<> rir;
-        class_<wt,
-               bases<asu_u_star_parameter>,
-               std::auto_ptr<wt> >("scalar_scaled_u_star", no_init)
-          .def(init<independent_scalar_parameter *,
-                    wt::scatterer_type *>
-               ((arg("scalar"),
-                 arg("scatterer"))))
-          .add_property("reference", make_function(&wt::reference, rir))
-          ;
-        implicitly_convertible<std::auto_ptr<wt>, std::auto_ptr<parameter> >();
-      }
-    };
-
-    struct scalar_scaled_u_iso_parameter_wrapper {
-      typedef scalar_scaled_u_iso_parameter wt;
-
-      static void wrap() {
-        using namespace boost::python;
-        return_internal_reference<> rir;
-        class_<wt,
-               bases<asu_u_iso_parameter>,
-               std::auto_ptr<wt> >("scalar_scaled_u_iso", no_init)
-          .def(init<independent_scalar_parameter *,
-                    wt::scatterer_type *>
-               ((arg("scalar"),
-                 arg("scatterer"))))
-          .add_property("reference", &wt::reference)
-          ;
-        implicitly_convertible<std::auto_ptr<wt>, std::auto_ptr<parameter> >();
-      }
-    };
-
     struct shared_u_iso_wrapper  {
       typedef shared_u_iso wt;
 
@@ -169,8 +131,6 @@ namespace smtbx { namespace refinement { namespace constraints {
     void wrap_shared() {
       shared_u_star_wrapper::wrap();
       shared_rotated_u_star_wrapper::wrap();
-      scalar_scaled_u_star_parameter_wrapper::wrap();
-      scalar_scaled_u_iso_parameter_wrapper::wrap();
       shared_u_iso_wrapper::wrap();
       shared_site_wrapper::wrap();
       shared_fp_wrapper::wrap();
