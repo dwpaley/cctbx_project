@@ -16,6 +16,46 @@ class number_of_arguments_error(command_line_error): pass
 
 class energy_missing_error(RuntimeError): pass
 
+def make_ins_fstring():
+  return '''TITL MONOCOPLUS_30KEV_A OLEX2: imported from CIF
+CELL 0.41328 11.7916 15.5197 16.596 88.652 81.195 88.489
+ZERR 2 0.0005 0.0007 0.0008 0.001 0.001 0.001
+LATT 1
+SFAC C H Co F O P Se
+UNIT 62 150 12 1 2 10 16
+
+TEMP 23
+WGHT 0.1
+FVAR 1
+
+{}
+{}
+{}
+{}
+{}
+{}
+
+
+C  1     0.47460  0.19890  0.53260  11.00000  .01 
+O  5     0.44490  0.18280  0.47220  11.00000  .01 
+P1  6     0.89992  0.31742  0.56069  11.00000  .01 
+P2  6     0.74588  0.33278  0.92425  11.00000  .01 
+P3  6     0.46853  0.52079  0.70287  11.00000  .01 
+P4  6     0.28192  0.21304  0.87753  11.00000  .01 
+P5  6     0.70667  0.00709  0.76057  11.00000  .01 
+Se1  7     0.72379  0.41415  0.72947  11.00000  .01 
+Se2  7     0.81676  0.21645  0.75325  11.00000  .01 
+Se3  7     0.48372  0.37075  0.84973  11.00000  .01 
+Se4  7     0.46182  0.11467  0.71655  11.00000  .01 
+Se5  7     0.70515  0.15585  0.59986  11.00000  .01 
+Se6  7     0.57019  0.17442  0.87613  11.00000  .01 
+Se7  7     0.37241  0.31241  0.68768  11.00000  .01 
+Se8  7     0.61039  0.35720  0.57449  11.00000  .01 
+hklf 4
+
+END
+'''
+
 def make_parser():
   parser = argparse.ArgumentParser(
       description='''Refinement of inelastic scattering factors. Contact: Daniel
@@ -157,9 +197,9 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       sc.flags.set_grad_fdp_aniso(True)
       anom_sc_list.append(sc)
       xm.restraints_manager.isotropic_fp_proxies.append(
-          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=1))
+          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=.1))
       xm.restraints_manager.isotropic_fdp_proxies.append(
-          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=1))
+          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=.1))
 
   ls = xm.least_squares()
   steps = lstbx.normal_eqns_solving.naive_iterations(
@@ -248,18 +288,23 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
 #  with their f' and f" tensors (suitably scaled) taking the place of ADPs.
 #  The output lines can be copied into a .res file for viewing.
 #
-#  for sc in anom_sc_list:
-#    fp_cif = adptbx.u_star_as_u_cif(uc, sc.fp_star)
-#    fp_s = [x * -.01 for x in fp_cif]
-#    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-#      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
-#
-#  for sc in anom_sc_list:
-#    fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
-#    fdp_s = [x * .02 for x in fdp_cif]
-#    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-#      sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
-#
+  fp_list = []
+  for sc in anom_sc_list:
+    fp_cif = adptbx.u_star_as_u_cif(uc, sc.fp_star)
+    fp_s = [x * -.01 for x in fp_cif]
+    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
+    fp_list.append("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
+  with open('{}.ins'.format(energy), 'w') as f:
+    f.write(make_ins_fstring().format(*fp_list))
+
+  for sc in anom_sc_list:
+    fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
+    fdp_s = [x * .02 for x in fdp_cif]
+    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+      sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
+
 
   # Directions (in crystal coordinates) on which f' and f" tensors will be
   # projected for output. Only for testing. These all give a projection on a
