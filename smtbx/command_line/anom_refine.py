@@ -159,6 +159,8 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
   if args.table:
     if energy: result += "{:.1f} ".format(energy)
     else: result += "{} ".format(args.reflections)
+    result += "{:.5f} ".format(ls.r1_factor()[0])
+    result += "1.00000 "
     for sc in anom_sc_list:
       result += "{:.3f} ".format(sc.fp)
     for sc in anom_sc_list:

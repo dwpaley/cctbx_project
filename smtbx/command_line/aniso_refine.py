@@ -55,6 +55,44 @@ hklf 4
 
 END
 '''
+def make_ins_fstring_monoP_se():
+  return '''TITL MONOP_SE OLEX2: imported from CIF
+CELL 0.41328 11.7954 23.4662 23.0432 90 95.308 90
+ZERR 4 0.0006 0.0011 0.0011 0 0.001 0
+LATT 1
+SYMM -X,0.5+Y,0.5-Z
+SFAC C H Co P Se
+UNIT 168 408 24 24 32
+
+TEMP -173
+WGHT 0.1
+FVAR 1
+
+{}
+{}
+{}
+{}
+{}
+{}
+{}
+{}
+
+Co1   3     0.33394  0.58458  0.69843  11.00000  .01 
+Co2   3     0.40616  0.60309  0.82382  11.00000  .01 
+Co3   3     0.19897  0.53775  0.78893  11.00000  .01 
+Co4   3     0.11039  0.63457  0.71464  11.00000  .01 
+Co5   3     0.31916  0.69970  0.74937  11.00000  .01 
+Co6   3     0.18140  0.65293  0.83896  11.00000  .01 
+P1    4     0.41270  0.55378  0.62443  11.00000  .01 
+P2    4     0.55423  0.58821  0.88316  11.00000  .01 
+P3    4     0.13548  0.45475  0.80673  11.00000  .01 
+P4    4     -.03514  0.65012  0.65423  11.00000  .01 
+P5    4     0.39186  0.78014  0.72920  11.00000  .01 
+P6    4     0.09542  0.68617  0.90950  11.00000  .01
+HKLF 4
+
+END
+'''
 
 def make_parser():
   parser = argparse.ArgumentParser(
@@ -197,9 +235,9 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       sc.flags.set_grad_fdp_aniso(True)
       anom_sc_list.append(sc)
       xm.restraints_manager.isotropic_fp_proxies.append(
-          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=.1))
+          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=100))
       xm.restraints_manager.isotropic_fdp_proxies.append(
-          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=.1))
+          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=100))
 
   ls = xm.least_squares()
   steps = lstbx.normal_eqns_solving.naive_iterations(
@@ -207,9 +245,9 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
     n_max_iterations=args.max_cycles,
     gradient_threshold=args.stop_deriv,
     step_threshold=args.stop_shift)
-  #from sys import stderr
-  #sys.stderr.write(str(ls.r1_factor()))
-  #sys.stderr.write("\n")
+  from sys import stderr
+  sys.stderr.write(str(ls.r1_factor()))
+  sys.stderr.write("\n")
 
   def fp_proj(sc, vec, uc):
     import numpy as np
@@ -292,18 +330,18 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
   for sc in anom_sc_list:
     fp_cif = adptbx.u_star_as_u_cif(uc, sc.fp_star)
     fp_s = [x * -.01 for x in fp_cif]
-    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-      sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
-    fp_list.append("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+    #print("{} 5 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+    #  sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
+    fp_list.append("{} 5 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
       sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
   with open('{}.ins'.format(energy), 'w') as f:
-    f.write(make_ins_fstring().format(*fp_list))
+    f.write(make_ins_fstring_monoP_se().format(*fp_list))
 
   for sc in anom_sc_list:
     fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
     fdp_s = [x * .02 for x in fdp_cif]
-    print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
-      sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
+    #print("{} 3 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
+    #  sc.label, sc.site[0], sc.site[1], sc.site[2], fdp_s[0], fdp_s[1], fdp_s[2], fdp_s[5], fdp_s[4], fdp_s[3]))
 
 
   # Directions (in crystal coordinates) on which f' and f" tensors will be
@@ -326,16 +364,29 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       ( .115,-.248, .033),
       ( .304, .053,-.149),
       ( .115,-.248, .033),
-      ( .139, .073, .199)]
+      ( .139, .073, .199)],
+
+  #monoP, Se
+  3:  [
+      ( .259,-.205, .005),
+      ( .207, .156, .163),
+      (-.018, .097,-.225),
+      ( .444, .048,-.054),
+      (-.018, .097,-.225),
+      ( .444, .048,-.054),
+      ( .259,-.205, .005),
+      ( .207, .156, .163)]
   }
 
   if args.table:
     vecs = ProjectionUvwDict[args.proj]
     if energy: result += "{:.1f} ".format(energy)
     else: result += "{} ".format(args.reflections)
-    for i_sc in range(6):
+    result += "{:.5f} ".format(ls.r1_factor()[0])
+    result += "1.00000 "
+    for i_sc in range(len(anom_sc_list)):
       result += "{:.3f} ".format(fp_proj(anom_sc_list[i_sc], vecs[i_sc], uc))
-    for i_sc in range(6):
+    for i_sc in range(len(anom_sc_list)):
       result += "{:.3f} ".format(fdp_proj(anom_sc_list[i_sc], vecs[i_sc], uc))
     result += '\n'
 
