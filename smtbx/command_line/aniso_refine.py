@@ -167,6 +167,11 @@ start,length.'''
     default=None,
     help='For testing: specify the projections of f\' and f" tensors to output.'
          ' Current choices are 1: monoCO, Co atoms; 2: monoCOplus, Co atoms')
+  parser.add_argument(
+    '-A', '--adp_global',
+    action='store_true',
+    help='Refine a global ADP scaling parameter (an extremely simple model for'
+         'beam damage)')
   return parser
 
 def run(args):
@@ -189,6 +194,8 @@ def run(args):
     xm.add_reflections_with_polarization(args.reflections)
   else:
     raise NotImplementedError("Only .cif input supported")
+
+  import ipdb;ipdb.set_trace()
 
   # Look for beam energy
   if args.energy:
@@ -235,9 +242,19 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
       sc.flags.set_grad_fdp_aniso(True)
       anom_sc_list.append(sc)
       xm.restraints_manager.isotropic_fp_proxies.append(
-          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=100))
+          adp_restraints.isotropic_fp_proxy(i_seqs=(i,), weight=0))
       xm.restraints_manager.isotropic_fdp_proxies.append(
-          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=100))
+          adp_restraints.isotropic_fdp_proxy(i_seqs=(i,), weight=0))
+
+  if args.adp_global:
+    from smtbx.refinement.constraints.adp import scalar_scaled_u
+    for sc in xm.xray_structure.scatterers():
+      if sc.flags.use_u_aniso():
+        sc.flags.set_grad_u_aniso(True)
+      else:
+        sc.flags.set_grad_u_iso(True)
+    adp_scale = scalar_scaled_u(range(len(xm.xray_structure.scatterers())))
+    xm.constraints.append(adp_scale)
 
   ls = xm.least_squares()
   steps = lstbx.normal_eqns_solving.naive_iterations(
@@ -334,8 +351,8 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
     #  sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
     fp_list.append("{} 5 {:.5f} {:.5f} {:.5f} 11 {:.5f} {:.5f} {:.5f} =\n {:.5f} {:.5f} {:.5f} ".format(
       sc.label, sc.site[0], sc.site[1], sc.site[2], fp_s[0], fp_s[1], fp_s[2], fp_s[5], fp_s[4], fp_s[3]))
-  with open('{}.ins'.format(energy), 'w') as f:
-    f.write(make_ins_fstring_monoP_se().format(*fp_list))
+  #with open('{}.ins'.format(energy), 'w') as f:
+  #  f.write(make_ins_fstring_monoP_se().format(*fp_list))
 
   for sc in anom_sc_list:
     fdp_cif = adptbx.u_star_as_u_cif(uc, sc.fdp_star)
@@ -383,7 +400,10 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
     if energy: result += "{:.1f} ".format(energy)
     else: result += "{} ".format(args.reflections)
     result += "{:.5f} ".format(ls.r1_factor()[0])
-    result += "1.00000 "
+    if args.adp_global:
+      result += "{:.5f} ".format(adp_scale.scalar.value)
+    else:
+      result += "1.00000 "
     for i_sc in range(len(anom_sc_list)):
       result += "{:.3f} ".format(fp_proj(anom_sc_list[i_sc], vecs[i_sc], uc))
     for i_sc in range(len(anom_sc_list)):

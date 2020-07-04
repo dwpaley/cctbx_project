@@ -326,7 +326,16 @@ class hklf_reader
         //compute the polarization vectors and pol factor
         vec3_t hkl_yl =
           hkl_calculator.vl_to_hkl(vec3_t(0,1,0), UB, phi, chi, omega);
-        vec3_t u_inc = hkl_calculator.perpendicular(h_inc, hkl_yl);
+        vec3_t hkl_xl =
+          hkl_calculator.vl_to_hkl(vec3_t(1,0,0), UB, phi, chi, omega);
+        vec3_t hkl_zl =
+          hkl_calculator.vl_to_hkl(vec3_t(0,0,1), UB, phi, chi, omega);
+        vec3_t u_inc = hkl_calculator.perpendicular(hkl_xl, hkl_yl);
+        std::cout<<"h_inc: "<<h_inc[0]<<" "<<h_inc[1]<<" "<<h_inc[2]<<std::endl;
+        std::cout<<"hkl_xl: "<<hkl_xl[0]<<" "<<hkl_xl[1]<<" "<<hkl_xl[2]<<std::endl;
+        std::cout<<"u_inc: "<<u_inc[0]<<" "<<u_inc[1]<<" "<<u_inc[2]<<std::endl;
+        std::cout<<"hkl_zl: "<<hkl_zl[0]<<" "<<hkl_zl[1]<<" "<<hkl_zl[2]<<std::endl;
+        std::cout<<std::endl;
         vec3_t u_scat = hkl_calculator.plane_projection(u_inc, h_scat, true);
         vec3_t v_scat = hkl_calculator.perpendicular(u_scat, h_scat);
         double pol_factor = hkl_calculator.cosine(u_inc, u_scat);

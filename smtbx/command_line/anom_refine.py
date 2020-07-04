@@ -177,24 +177,24 @@ Inelastic form factors for \n non-refined atoms may be inaccurate.\n''')
     if energy: result += "{:.1f} ".format(energy)
     else: result += "{} ".format(args.reflections)
     result += "{:.5f} ".format(ls.r1_factor()[0])
-    result += "1.00000 "
+    result += "{:.5f} ".format(adp_scale.scalar.value)
     for sc in anom_sc_list:
       result += "{:.3f} ".format(sc.fp)
     for sc in anom_sc_list:
       result += "{:.3f} ".format(sc.fdp)
     result += '\n'
 
-  if args.table_with_su:
-    result += ' ' * len(label)
-    for i, sc in anom_sc_list:
-      label_fp = '{}.fp'.format(sc.label)
-      sigma_fp = sqrt(cov_an.variance_of(label_fp))
-      result += "{:6.3f} ".format(sigma_fp)
-    for i, sc in anom_sc_list:
-      label_fdp = '{}.fdp'.format(sc.label)
-      sigma_fdp = sqrt(cov_an.variance_of(label_fdp))
-      result += "{:6.3f} ".format(sigma_fdp)
-    result += '\n'
+  #if args.table_with_su:
+  #  result += ' ' * len(label)
+  #  for i, sc in anom_sc_list:
+  #    label_fp = '{}.fp'.format(sc.label)
+  #    sigma_fp = sqrt(cov_an.variance_of(label_fp))
+  #    result += "{:6.3f} ".format(sigma_fp)
+  #  for i, sc in anom_sc_list:
+  #    label_fdp = '{}.fdp'.format(sc.label)
+  #    sigma_fdp = sqrt(cov_an.variance_of(label_fdp))
+  #    result += "{:6.3f} ".format(sigma_fdp)
+  #  result += '\n'
 
   if not (args.table or args.table_with_su):
     from libtbx.utils import format_float_with_standard_uncertainty \
