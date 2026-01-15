@@ -27,6 +27,7 @@ import scitbx.cubicle_neighbors
 from cctbx.uctbx.near_minimum import find_near_minimum_settings, \
     find_near_minimum_settings_multiples, cell_distance
 import numpy as np
+from fractions import Fraction
 cubicles_max_memory_allocation_set(
   number_of_bytes=scitbx.cubicle_neighbors.cubicles_max_memory_allocation_get())
 
@@ -575,14 +576,51 @@ class symmetry(object):
     best_idx = tied_indices[self.nearest_setting_count % len(tied_indices)]
     self.nearest_setting_count += 1
 
-    # Get the transformation matrix and invert it for change_of_basis_op
-    # Convention: P from find_near_minimum_settings satisfies P = inv(cb.c().r())
-    # So to construct cb_op, we need to pass P^{-1}
+    # Get the transformation matrix for change_of_basis_op
+    # Convention: P from find_near_minimum_settings transforms basis vectors (G' = P^T @ G @ P)
+    # The change_of_basis_op string format describes basis transformation directly,
+    # so we pass P (not P^{-1})
     P = settings[best_idx]['P']
-    P_flat = tuple(float(x) for x in P.ravel())
 
-    rot_mx = sgtbx.rot_mx(P_flat)
-    cb_near = sgtbx.change_of_basis_op(sgtbx.rt_mx(rot_mx))
+    # Convert P to string format for change_of_basis_op
+    # Format: "c1*a+c2*b+c3*c, c4*a+c5*b+c6*c, c7*a+c8*b+c9*c"
+    # where coefficients can be rational numbers
+    def matrix_to_cb_string(mat):
+      """Convert 3x3 matrix to change_of_basis_op string format.
+
+      String describes how new basis vectors relate to old: new = mat * old
+      """
+      basis_names = ['a', 'b', 'c']
+      terms = []
+
+      for row in range(3):
+        row_terms = []
+        for col in range(3):
+          coeff = Fraction(mat[row, col]).limit_denominator()
+          if coeff == 0:
+            continue
+
+          # Format coefficient
+          if coeff == 1:
+            coeff_str = ''
+          elif coeff == -1:
+            coeff_str = '-'
+          elif coeff.denominator == 1:
+            coeff_str = f'{coeff.numerator}*'
+          else:
+            coeff_str = f'{coeff.numerator}/{coeff.denominator}*'
+
+          term = f'{coeff_str}{basis_names[col]}'
+          row_terms.append(term)
+
+        if not row_terms:
+          row_terms = ['0']
+        terms.append('+'.join(row_terms).replace('+-', '-'))
+
+      return ','.join(terms)
+
+    cb_string = matrix_to_cb_string(P)
+    cb_near = sgtbx.change_of_basis_op(cb_string)
 
     # Apply transformations: other_minimum -> near-reduced -> self's original setting
     result_uc = mc_other.unit_cell().change_basis(cb_near).change_basis(cbi_self)
