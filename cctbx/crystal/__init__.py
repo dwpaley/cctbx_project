@@ -577,19 +577,18 @@ class symmetry(object):
     self.nearest_setting_count += 1
 
     # Get the transformation matrix for change_of_basis_op
-    # Convention: P from find_near_minimum_settings transforms basis vectors (G' = P^T @ G @ P)
-    # The change_of_basis_op string format describes basis transformation directly,
-    # so we pass P (not P^{-1})
+    # Convention: P from find_near_minimum_settings satisfies P = inv(cb.c().r())
+    # So to construct cb_op, we need to pass (P^{-1})^T
+    # (The transpose accounts for row-major vs column-major ordering)
     P = settings[best_idx]['P']
+    P_inv = np.linalg.inv(P)
+    P_inv_T = P_inv.T
 
-    # Convert P to string format for change_of_basis_op
+    # Convert (P^{-1})^T to string format for change_of_basis_op
     # Format: "c1*a+c2*b+c3*c, c4*a+c5*b+c6*c, c7*a+c8*b+c9*c"
     # where coefficients can be rational numbers
     def matrix_to_cb_string(mat):
-      """Convert 3x3 matrix to change_of_basis_op string format.
-
-      String describes how new basis vectors relate to old: new = mat * old
-      """
+      """Convert 3x3 matrix to change_of_basis_op string format."""
       basis_names = ['a', 'b', 'c']
       terms = []
 
@@ -619,7 +618,7 @@ class symmetry(object):
 
       return ','.join(terms)
 
-    cb_string = matrix_to_cb_string(P)
+    cb_string = matrix_to_cb_string(P_inv_T)
     cb_near = sgtbx.change_of_basis_op(cb_string)
 
     # Apply transformations: other_minimum -> near-reduced -> self's original setting
