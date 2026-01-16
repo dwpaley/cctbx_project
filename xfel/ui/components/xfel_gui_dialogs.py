@@ -112,6 +112,20 @@ class SettingsDialog(BaseDialog):
 
     self.main_sizer = wx.BoxSizer(wx.VERTICAL)
 
+    # Project management control
+    self.project = gctr.ComboButtonCtrl(self,
+                                        name='project',
+                                        label='Project',
+                                        label_style='bold',
+                                        label_size=(150, -1),
+                                        big_button=True,
+                                        big_button_size=(160, -1),
+                                        )
+#                                       value=self.params.experiment_tag if self.params.experiment_tag is not None else "")
+    self.main_sizer.Add(self.project,
+                        flag=wx.EXPAND | wx.ALL,
+                        border=10)
+
     # Experiment tag and DB Credentials button
     self.db_cred = gctr.TextButtonCtrl(self,
                                        name='db_cred',
@@ -120,7 +134,7 @@ class SettingsDialog(BaseDialog):
                                        label_size=(150, -1),
                                        big_button=True,
                                        big_button_label='DB Credentials...',
-                                       big_button_size=(130, -1),
+                                       big_button_size=(160, -1),
                                        value=self.params.experiment_tag if self.params.experiment_tag is not None else "")
     self.main_sizer.Add(self.db_cred,
                         flag=wx.EXPAND | wx.ALL,
