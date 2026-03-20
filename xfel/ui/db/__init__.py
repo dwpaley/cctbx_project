@@ -92,6 +92,7 @@ def get_db_connection(params, block=True, autocommit=True):
         print("MySQL can't create a new thread. Retry", retry_count)
       else:
         raise e
+      print(str(e))
       import time
       time.sleep(sleep_time)
       sleep_time *= 2
