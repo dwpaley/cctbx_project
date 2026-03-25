@@ -50,7 +50,7 @@ STATS_BIN="{statistics_bin_i}"
 mkdir -p ${{STATUS_DIR}}
 
 # Determine task IDs based on execution mode
-if [ -n $SLURM_ARRAY_TASK_ID ]; then
+if [ -n "$SLURM_ARRAY_TASK_ID" ]; then
   TASK_IDS=($SLURM_ARRAY_TASK_ID)
   RUN_CMD="srun -n ${{NPROC}}"
 else
@@ -73,7 +73,7 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
     # Phenix refinement coordinator task
 
     # In SLURM mode, poll for all merges to complete
-    if [ -n $SLURM_ARRAY_TASK_ID ]; then
+    if [ -n "$SLURM_ARRAY_TASK_ID" ]; then
       echo "Waiting for all stage 2 merge tasks to complete..."
       while true; do
         DONE_COUNT=$(ls ${{STATUS_DIR}}/slice_*.done 2>/dev/null | wc -l)
@@ -222,6 +222,12 @@ class prepare_spread(worker):
     self.logger.log("Rank %d has %d experiments with energies" % (
       self.mpi_helper.rank, len(local_energies)))
     self.logger.log_step_time("COMPUTE_ENERGIES", True)
+
+    # Validate parameters for width binning mode
+    if binning_mode == 'width':
+        if self.params.prepare.spread.bin_start_eV is None or \
+           self.params.prepare.spread.bin_end_eV is None:
+            raise ValueError("bin_start_eV and bin_end_eV must be specified when binning='width'")
 
     if binning_mode == 'count':
       # Equal-count percentile binning
@@ -541,6 +547,12 @@ class prepare_spread(worker):
     # Activation scripts
     cctbx_activate = self.params.prepare.spread.cctbx_activate
     phenix_activate = self.params.prepare.spread.phenix_activate
+
+    # Validate activation scripts exist
+    if cctbx_activate and not os.path.exists(cctbx_activate):
+        raise ValueError(f"cctbx activation script not found: {cctbx_activate}")
+    if phenix_activate and not os.path.exists(phenix_activate):
+        raise ValueError(f"phenix activation script not found: {phenix_activate}")
 
     # Read base phil content if provided
     base_phil_content = ""
