@@ -73,12 +73,6 @@ Configuration options:
     parse(master_phil_str, process_includes = True).show(attributes_level=2)
     return
 
-  # If custom settings file provided, set environment variable
-  if len(args) > 0:
-    import os
-    custom_settings = os.path.expanduser(args[0])
-    os.environ['CCTBX_XFEL_SETTINGS'] = custom_settings
-
   app = MainApp(0)
   app.MainLoop()
 
