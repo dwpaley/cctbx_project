@@ -47,7 +47,7 @@ PHENIX_ACTIVATE="{phenix_activate}"
 N_SCATTERERS={n_anomalous_scatterers}
 STATS_BIN="{statistics_bin_i}"
 
-mkdir -p ${{STATUS_DIR}}
+mkdir -p "${{STATUS_DIR}}"
 
 # Determine task IDs based on execution mode
 if [ -n "$SLURM_ARRAY_TASK_ID" ]; then
@@ -61,14 +61,14 @@ fi
 for TASK_ID in ${{TASK_IDS[@]}}; do
   if [ $TASK_ID -lt $N_SLICES ]; then
     # Stage 2 merge task
-    source $CCTBX_ACTIVATE
+    source "$CCTBX_ACTIVATE"
     SLICE_IDX=$(printf "%03d" $TASK_ID)
     PHIL_FILE="${{SCRIPTS_DIR}}/stage2_slice_${{SLICE_IDX}}.phil"
     echo "Running stage 2 merge for slice ${{SLICE_IDX}}..."
     ${{RUN_CMD}} cctbx.xfel.merge ${{PHIL_FILE}}
 
     # Write status file on completion
-    touch ${{STATUS_DIR}}/slice_${{SLICE_IDX}}.done
+    touch "${{STATUS_DIR}}"/slice_${{SLICE_IDX}}.done
   else
     # Phenix refinement coordinator task
 
@@ -76,7 +76,7 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
     if [ -n "$SLURM_ARRAY_TASK_ID" ]; then
       echo "Waiting for all stage 2 merge tasks to complete..."
       while true; do
-        DONE_COUNT=$(ls ${{STATUS_DIR}}/slice_*.done 2>/dev/null | wc -l)
+        DONE_COUNT=$(ls "${{STATUS_DIR}}"/slice_*.done 2>/dev/null | wc -l)
         if [ $DONE_COUNT -ge $N_SLICES ]; then
           echo "All $N_SLICES merge tasks complete."
           break
@@ -87,7 +87,7 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
     fi
 
     # Activate phenix environment and run all refinements in parallel
-    source $PHENIX_ACTIVATE
+    source "$PHENIX_ACTIVATE"
 
     # Scrape preliminary multiplicity results before phenix refinements
     echo "Scraping preliminary multiplicity results..."
@@ -96,11 +96,11 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
     FIRST_SLICE_DIR="${{STAGE2_DIR}}/slice_000"
     FIRST_MERGE_LOG="${{FIRST_SLICE_DIR}}/iobs_main.log"
     if [ -n "$STATS_BIN" ] && [ -f "$FIRST_MERGE_LOG" ]; then
-      RES_RANGE=$(sed -n '/all accepted experiments/,/^All /p' $FIRST_MERGE_LOG | awk -v bin="$STATS_BIN" '$1 == bin {{print $2, $3, $4}}')
-      echo "# Resolution bin $STATS_BIN: $RES_RANGE" > $MULTI_FILE
-      echo "# slice wavelength asu_multi" >> $MULTI_FILE
+      RES_RANGE=$(sed -n '/all accepted experiments/,/^All /p' "$FIRST_MERGE_LOG" | awk -v bin="$STATS_BIN" '$1 == bin {{print $2, $3, $4}}')
+      echo "# Resolution bin $STATS_BIN: $RES_RANGE" > "$MULTI_FILE"
+      echo "# slice wavelength asu_multi" >> "$MULTI_FILE"
     else
-      echo "# slice wavelength asu_multi" > $MULTI_FILE
+      echo "# slice wavelength asu_multi" > "$MULTI_FILE"
     fi
 
     for i in $(seq 0 $((N_SLICES - 1))); do
@@ -108,16 +108,16 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
       SLICE_DIR="${{STAGE2_DIR}}/slice_${{SLICE_IDX}}"
       MERGE_LOG="${{SLICE_DIR}}/iobs_main.log"
 
-      WAVELENGTH=$(grep 'Average wavelength' $MERGE_LOG 2>/dev/null | tail -1 | awk '{{print $3}}' | tr -d '()' || echo "NA")
+      WAVELENGTH=$(grep 'Average wavelength' "$MERGE_LOG" 2>/dev/null | tail -1 | awk '{{print $3}}' | tr -d '()' || echo "NA")
 
       if [ -n "$STATS_BIN" ]; then
-        ASU_MULTI=$(sed -n '/all accepted experiments/,/^All /p' $MERGE_LOG 2>/dev/null | awk -v bin="$STATS_BIN" '$1 == bin {{print $7}}')
+        ASU_MULTI=$(sed -n '/all accepted experiments/,/^All /p' "$MERGE_LOG" 2>/dev/null | awk -v bin="$STATS_BIN" '$1 == bin {{print $7}}')
         [ -z "$ASU_MULTI" ] && ASU_MULTI="NA"
       else
         ASU_MULTI="NA"
       fi
 
-      echo "$SLICE_IDX $WAVELENGTH $ASU_MULTI" >> $MULTI_FILE
+      echo "$SLICE_IDX $WAVELENGTH $ASU_MULTI" >> "$MULTI_FILE"
     done
     echo "Preliminary results written to $MULTI_FILE"
 
@@ -150,11 +150,11 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
     FIRST_SLICE_DIR="${{STAGE2_DIR}}/slice_000"
     FIRST_MERGE_LOG="${{FIRST_SLICE_DIR}}/iobs_main.log"
     if [ -n "$STATS_BIN" ] && [ -f "$FIRST_MERGE_LOG" ]; then
-      RES_RANGE=$(sed -n '/all accepted experiments/,/^All /p' $FIRST_MERGE_LOG | awk -v bin="$STATS_BIN" '$1 == bin {{print $2, $3, $4}}')
-      echo "# Resolution bin $STATS_BIN: $RES_RANGE" > $RESULTS_FILE
-      echo "# slice wavelength asu_multi r_free f_prime[1..N] f_double_prime[1..N]" >> $RESULTS_FILE
+      RES_RANGE=$(sed -n '/all accepted experiments/,/^All /p' "$FIRST_MERGE_LOG" | awk -v bin="$STATS_BIN" '$1 == bin {{print $2, $3, $4}}')
+      echo "# Resolution bin $STATS_BIN: $RES_RANGE" > "$RESULTS_FILE"
+      echo "# slice wavelength asu_multi r_free f_prime[1..N] f_double_prime[1..N]" >> "$RESULTS_FILE"
     else
-      echo "# slice wavelength asu_multi r_free f_prime[1..N] f_double_prime[1..N]" > $RESULTS_FILE
+      echo "# slice wavelength asu_multi r_free f_prime[1..N] f_double_prime[1..N]" > "$RESULTS_FILE"
     fi
 
     for i in $(seq 0 $((N_SLICES - 1))); do
@@ -164,27 +164,27 @@ for TASK_ID in ${{TASK_IDS[@]}}; do
       REFINE_LOG="${{SLICE_DIR}}/refine_${{SLICE_IDX}}.log"
 
       # Extract wavelength from merge log
-      WAVELENGTH=$(grep 'Average wavelength' $MERGE_LOG 2>/dev/null | tail -1 | awk '{{print $3}}' | tr -d '()' || echo "NA")
+      WAVELENGTH=$(grep 'Average wavelength' "$MERGE_LOG" 2>/dev/null | tail -1 | awk '{{print $3}}' | tr -d '()' || echo "NA")
 
       # Extract asu multiplicity for specified bin from the correct table
       if [ -n "$STATS_BIN" ]; then
-        ASU_MULTI=$(sed -n '/all accepted experiments/,/^All /p' $MERGE_LOG 2>/dev/null | awk -v bin="$STATS_BIN" '$1 == bin {{print $7}}')
+        ASU_MULTI=$(sed -n '/all accepted experiments/,/^All /p' "$MERGE_LOG" 2>/dev/null | awk -v bin="$STATS_BIN" '$1 == bin {{print $7}}')
         [ -z "$ASU_MULTI" ] && ASU_MULTI="NA"
       else
         ASU_MULTI="NA"
       fi
 
       # Extract final R-free from phenix log
-      R_FREE=$(grep 'Final R-work' $REFINE_LOG 2>/dev/null | tail -1 | awk '{{print $NF}}' || echo "NA")
+      R_FREE=$(grep 'Final R-work' "$REFINE_LOG" 2>/dev/null | tail -1 | awk '{{print $NF}}' || echo "NA")
       [ -z "$R_FREE" ] && R_FREE="NA"
 
       # Extract f' values
-      F_PRIME=$(grep 'f_prime' $REFINE_LOG 2>/dev/null | grep -v refine | tail -$N_SCATTERERS | awk '{{print $2}}' | tr '\\n' ' ' || echo "NA")
+      F_PRIME=$(grep 'f_prime' "$REFINE_LOG" 2>/dev/null | grep -v refine | tail -$N_SCATTERERS | awk '{{print $2}}' | tr '\\n' ' ' || echo "NA")
 
       # Extract f'' values
-      F_DOUBLE_PRIME=$(grep 'f_double_prime' $REFINE_LOG 2>/dev/null | grep -v refine | tail -$N_SCATTERERS | awk '{{print $2}}' | tr '\\n' ' ' || echo "NA")
+      F_DOUBLE_PRIME=$(grep 'f_double_prime' "$REFINE_LOG" 2>/dev/null | grep -v refine | tail -$N_SCATTERERS | awk '{{print $2}}' | tr '\\n' ' ' || echo "NA")
 
-      echo "$SLICE_IDX $WAVELENGTH $ASU_MULTI $R_FREE $F_PRIME $F_DOUBLE_PRIME" >> $RESULTS_FILE
+      echo "$SLICE_IDX $WAVELENGTH $ASU_MULTI $R_FREE $F_PRIME $F_DOUBLE_PRIME" >> "$RESULTS_FILE"
     done
 
     echo "Results written to $RESULTS_FILE"
@@ -216,18 +216,18 @@ class prepare_spread(worker):
     binning_mode = self.params.prepare.spread.binning
     output_dir = self.params.prepare.spread.output_dir or self.params.output.output_dir
 
+    # Validate parameters for width binning mode (fail-fast)
+    if binning_mode == 'width':
+        if self.params.prepare.spread.bin_start_eV is None or \
+           self.params.prepare.spread.bin_end_eV is None:
+            raise ValueError("bin_start_eV and bin_end_eV must be specified when binning='width'")
+
     # Step 1: Compute local energies from wavelengths
     self.logger.log_step_time("COMPUTE_ENERGIES")
     local_energies, expt_to_energy = self._compute_local_energies(experiments)
     self.logger.log("Rank %d has %d experiments with energies" % (
       self.mpi_helper.rank, len(local_energies)))
     self.logger.log_step_time("COMPUTE_ENERGIES", True)
-
-    # Validate parameters for width binning mode
-    if binning_mode == 'width':
-        if self.params.prepare.spread.bin_start_eV is None or \
-           self.params.prepare.spread.bin_end_eV is None:
-            raise ValueError("bin_start_eV and bin_end_eV must be specified when binning='width'")
 
     if binning_mode == 'count':
       # Equal-count percentile binning
@@ -263,6 +263,12 @@ class prepare_spread(worker):
       self.logger.log_step_time("ASSIGN_BINS")
       expt_to_bin = self._assign_experiments_to_bins_width(expt_to_energy, bin_start, bin_end, n_bins)
       self.logger.log_step_time("ASSIGN_BINS", True)
+
+      # Log warning if experiments are excluded
+      if self.mpi_helper.rank == 0:
+          n_excluded = sum(1 for b in expt_to_bin.values() if b == -1)
+          if n_excluded > 0:
+              self.logger.log(f"Warning: {n_excluded} experiments outside energy range [{bin_start}, {bin_end}] eV")
 
       file_prefix = "slice"
 
@@ -548,11 +554,23 @@ class prepare_spread(worker):
     cctbx_activate = self.params.prepare.spread.cctbx_activate
     phenix_activate = self.params.prepare.spread.phenix_activate
 
+    # Validate activation scripts are required and set
+    if not cctbx_activate:
+        raise ValueError("prepare.spread.cctbx_activate is required but not set")
+    if not phenix_activate:
+        raise ValueError("prepare.spread.phenix_activate is required but not set")
+
     # Validate activation scripts exist
     if cctbx_activate and not os.path.exists(cctbx_activate):
         raise ValueError(f"cctbx activation script not found: {cctbx_activate}")
     if phenix_activate and not os.path.exists(phenix_activate):
         raise ValueError(f"phenix activation script not found: {phenix_activate}")
+
+    # Validate phenix input files exist
+    if phenix_pdb_path and not os.path.exists(phenix_pdb_path):
+        raise ValueError(f"phenix_pdb file not found: {phenix_pdb_path}")
+    if phenix_phil_path and not os.path.exists(phenix_phil_path):
+        raise ValueError(f"phenix_phil file not found: {phenix_phil_path}")
 
     # Read base phil content if provided
     base_phil_content = ""
