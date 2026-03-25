@@ -690,3 +690,4 @@ class prepare_spread(worker):
 
     self.logger.log(f"Wrote {n_slices} slice phil files to {scripts_dir}")
     self.logger.log(f"Wrote batch script: run_spread.sh (use 'sbatch' for SLURM, 'bash' for local)")
+
