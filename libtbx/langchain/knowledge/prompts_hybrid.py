@@ -227,6 +227,14 @@ You must output a SINGLE JSON object matching this schema:
     "stop_reason": null
 }
 
+**CRITICAL STRATEGY RULE**: Strategy keys must ONLY contain parameters that are valid for
+the selected program. NEVER include parameters from a different program:
+- Do NOT put refinement.* parameters in a ligandfit or dock_in_map strategy
+- Do NOT put autosol.* parameters in a refine strategy
+- Do NOT put any parameters in a STOP response (strategy must be empty when stop=true)
+If you want to remember a parameter for a future cycle, omit it now — the agent will
+reconstruct it when the correct program runs.
+
 ### PROGRAM REFERENCE
 
 **phenix.xtriage** - Data quality analysis (X-ray)
@@ -254,26 +262,53 @@ You must output a SINGLE JSON object matching this schema:
   Use: Alternative to resolve_cryo_em for map sharpening
   Output: *_sharpened.ccp4 (full map suitable for real_space_refine)
 
-**phenix.predict_and_build** - AlphaFold prediction + building
+**phenix.map_symmetry** - Detect point-group symmetry in cryo-EM map
+  Files: {map: .mrc/.ccp4}
+  Strategy: {resolution: N (optional)}
+  Output: symmetry_from_map.ncs_spec (use with resolve_cryo_em, apply_ncs)
+  Use: Run BEFORE resolve_cryo_em for symmetric structures; ncs_spec can also be used later with apply_ncs
+
+**phenix.predict_and_build** - AlphaFold prediction + MR + building
   Files: {sequence: .fa/.seq/.dat, data: .mtz/.sca (X-ray), full_map: .mrc/.ccp4 (cryo-EM), half_map: [.mrc, .mrc] (cryo-EM)}
   Strategy: {resolution: N, stop_after_predict: true/false}
   IMPORTANT: Set resolution if building (get from xtriage/mtriage)
-  For cryo-EM: Use full_map= for single map, or half_map= twice for half-maps, or both
+  NOTE: By default (stop_after_predict=False), this runs the FULL workflow: prediction → molecular replacement → model building
+  NOTE: Only set stop_after_predict=True for cryo-EM stepwise workflow where you want just the predicted model
+  WARNING: This is NOT a density modification tool! Do NOT use for "density modification" - use phenix.autobuild_denmod instead
+  For cryo-EM maps:
+    - If you have a FULL MAP: use full_map=filename.ccp4
+    - If you ONLY have HALF MAPS: use half_map=file1.ccp4 half_map=file2.ccp4 (NO full_map!)
+    - NEVER use a half-map as full_map - half-maps have names like _1.ccp4, _2.ccp4, half1, half2
+
+**phenix.autobuild_denmod** - X-ray density modification (map improvement)
+  Files: {data: .mtz (refined MTZ with phases), sequence: .fa/.seq, model: .pdb (optional)}
+  Output: overall_best_denmod_map_coeffs.mtz with FWT/PHFWT map coefficients
+  Use: Before ligand fitting to improve map quality
+  NOTE: This runs autobuild with maps_only=True (no model building, just map improvement)
+  NOTE: For ligandfit using this output, set file_info.input_labels="FWT PHFWT"
 
 **phenix.process_predicted_model** - Prepare AlphaFold model for MR
   Files: {model: .pdb}
   Use: After predict_and_build (X-ray or stepwise cryo-EM) to prepare model for phaser
 
 **phenix.phaser** - Molecular replacement
-  Files: {data: .mtz/.sca/.hkl, model: .pdb}
+  Files: {data: .mtz/.sca/.hkl, model: .pdb, sequence: .seq/.fa (for composition)}
   REQUIRES: A model file
+
+  Include ALL sequence files for correct solvent content calculation.
+  Example: phenix.phaser data.mtz model.pdb seq1.seq seq2.seq phaser.mode=MR_AUTO
 
 **phenix.autosol** - Experimental phasing (SAD/MAD)
   Files: {data: .mtz/.sca/.hkl, sequence: .fa/.seq/.dat}
-  Strategy: {atom_type: "Se"/"S"/"Zn"/etc}
+  Strategy fields: {atom_type: "Se", additional_atom_types: "S", wavelength: 0.9792, sites: 5, resolution: 2.5}
   Use: When xtriage reports useful anomalous signal (to ~4Å or better)
   REQUIRES: Data with anomalous signal (I+/I- or F+/F-) AND sequence file
-  IMPORTANT: User must specify atom_type (anomalous scatterer) if not obvious
+  CRITICAL - Include these in strategy if user provides them:
+    - atom_type: Primary anomalous scatterer (Se, S, Zn, etc) - ONE type only
+    - additional_atom_types: Extra atom types to search (e.g., "S" if also looking for sulfur)
+    - wavelength: X-ray wavelength in Angstroms (e.g., 0.9792)
+    - sites: Expected number of anomalous sites (e.g., 5)
+    - resolution: High resolution limit in Angstroms (e.g., 2.5)
   After autosol: run phenix.autobuild to complete the model
 
 **phenix.refine** - Crystallographic refinement
@@ -309,6 +344,14 @@ You must output a SINGLE JSON object matching this schema:
 **phenix.dock_in_map** - Dock model into cryo-EM map
   Files: {model: .pdb, map: .mrc}
 
+**phenix.map_to_model** - De novo model building into cryo-EM map
+  Files: {full_map: .mrc/.ccp4, sequence: .fa/.seq/.dat}
+  Optional: {ncs_spec: .ncs_spec (from map_symmetry)}
+  Strategy: {resolution: N} (REQUIRED - get from mtriage)
+  CRITICAL: Do NOT include model= parameter. This builds a model from scratch.
+  NOTE: Use this when no predicted model is available, or for de novo building
+  For symmetric structures: run map_symmetry first, then include the .ncs_spec file
+
 **phenix.autobuild** - Build model into electron density
   Files: {data: .mtz (PHASED), sequence: .fa/.seq/.dat, model: .pdb (RECOMMENDED)}
   IMPORTANT: Always include model= with the latest refined PDB for best results
@@ -330,6 +373,14 @@ You must output a SINGLE JSON object matching this schema:
 **phenix.holton_geometry_validation** - Detailed geometry scoring
   Files: {model: .pdb}
   Overall geometry energy should be close to expected (~67)
+
+**phenix.polder** - Calculate Polder omit maps to evaluate ligand/residue placement
+  Files: {model: .pdb, data: .mtz}
+  Strategy: {selection: "chain A and resseq 88"} (REQUIRED - specify atoms to evaluate)
+  IMPORTANT: Polder works with STANDARD MTZ data (Fobs + R-free flags). It does NOT need
+  pre-calculated map coefficients or phases - it calculates the omit maps internally.
+  Use: Verify ligand placement by checking if density exists for the omitted atoms.
+  Output: CC values and conclusion ("likely to show", "inconclusive", "unlikely to show")
 
 ### STOP CONDITIONS
 
@@ -359,11 +410,92 @@ Set "stop": true when:
 3. **Don't repeat failing commands** - change strategy or try different program
 4. **Always set resolution for predict_and_build** if building
 5. **Files must exist** - only use files from the inventory
+6. **Strategy is program-specific** - never put parameters for program X in a strategy for program Y; when stop=true, strategy must be empty
 """
 
 
+def _format_directives_for_prompt(directives):
+    """
+    Format directives for inclusion in the LLM prompt.
+
+    Shows the extracted directives so the LLM knows what was understood
+    from the user's advice. This helps the LLM make consistent decisions.
+
+    Args:
+        directives: Directives dict
+
+    Returns:
+        str: Formatted section for prompt, or empty string if no directives
+    """
+    if not directives:
+        return ""
+
+    lines = []
+    lines.append("### EXTRACTED DIRECTIVES (from user advice)")
+    lines.append("The following directives were extracted and will be enforced automatically.")
+    lines.append("You should be aware of them when planning, but don't need to repeat them in your strategy.")
+    lines.append("")
+
+    # Program settings
+    prog_settings = directives.get("program_settings", {})
+    if prog_settings:
+        lines.append("**Program Settings:**")
+        for prog, settings in prog_settings.items():
+            if settings:
+                settings_str = ", ".join("%s=%s" % (k, v) for k, v in settings.items())
+                lines.append("- %s: %s" % (prog, settings_str))
+        lines.append("")
+
+    # Stop conditions
+    stop_cond = directives.get("stop_conditions", {})
+    if stop_cond:
+        lines.append("**Stop Conditions:**")
+        if "after_cycle" in stop_cond:
+            lines.append("- Stop after cycle %d" % stop_cond["after_cycle"])
+        if "after_program" in stop_cond:
+            after_prog = stop_cond["after_program"]
+            lines.append("- Stop after %s completes" % after_prog)
+            # Add explicit guidance to run the program - make it very clear
+            lines.append("- **CRITICAL: You MUST run %s before stopping. If it's in VALID PROGRAMS, choose it NOW.**" % after_prog)
+            lines.append("- Do NOT keep running refinement cycles - run %s instead!" % after_prog)
+        if "max_refine_cycles" in stop_cond:
+            lines.append("- Maximum %d refinement cycles" % stop_cond["max_refine_cycles"])
+        if "r_free_target" in stop_cond:
+            lines.append("- Target R-free: %.3f" % stop_cond["r_free_target"])
+        if "map_cc_target" in stop_cond:
+            lines.append("- Target map CC: %.2f" % stop_cond["map_cc_target"])
+        if stop_cond.get("skip_validation"):
+            lines.append("- Validation can be skipped before stopping")
+        lines.append("")
+
+    # Workflow preferences
+    workflow_prefs = directives.get("workflow_preferences", {})
+    if workflow_prefs:
+        lines.append("**Workflow Preferences:**")
+        if workflow_prefs.get("skip_programs"):
+            lines.append("- Skip: %s" % ", ".join(workflow_prefs["skip_programs"]))
+        if workflow_prefs.get("prefer_programs"):
+            lines.append("- Prefer: %s" % ", ".join(workflow_prefs["prefer_programs"]))
+        if workflow_prefs.get("use_experimental_phasing"):
+            lines.append("- Use experimental phasing (SAD/MAD)")
+        if workflow_prefs.get("use_molecular_replacement"):
+            lines.append("- Use molecular replacement")
+        lines.append("")
+
+    # Constraints
+    constraints = directives.get("constraints", [])
+    if constraints:
+        lines.append("**Additional Constraints:**")
+        for c in constraints:
+            lines.append("- %s" % c)
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def get_planning_prompt(history, analysis, available_files, previous_attempts=None,
-                        user_advice="", metrics_trend=None, workflow_state=None):
+                        user_advice="", metrics_trend=None, workflow_state=None,
+                        directives=None, best_files=None):
     """
     Constructs the system and user messages for the LLM planner.
 
@@ -375,10 +507,18 @@ def get_planning_prompt(history, analysis, available_files, previous_attempts=No
         user_advice: User-provided instructions
         metrics_trend: Output from analyze_metrics_trend()
         workflow_state: Output from detect_workflow_state()
+        directives: Structured directives extracted from user advice
+        best_files: Dict of {category: path} for best files to use
 
     Returns:
         tuple: (system_message, user_message)
     """
+    # Helper to escape % characters in user-provided strings to avoid format errors
+    def escape_percent(s):
+        if s is None:
+            return ""
+        return str(s).replace("%", "%%")
+
     # Start with the provided available files
     files_list = list(available_files)
 
@@ -465,15 +605,37 @@ def get_planning_prompt(history, analysis, available_files, previous_attempts=No
     if full_map_files or half_map_files:
         if full_map_files:
             file_summary.append("FULL MAPS (.mrc/.ccp4): %s" % ", ".join(full_map_files))
+        else:
+            file_summary.append("FULL MAPS (.mrc/.ccp4): NONE - do NOT use half-maps as full_map!")
         if half_map_files:
             file_summary.append("HALF MAPS (.mrc/.ccp4): %s" % ", ".join(half_map_files))
             if len(half_map_files) == 2:
-                file_summary.append("  -> Use with mtriage: half_map=%s half_map=%s" % (half_map_files[0], half_map_files[1]))
+                file_summary.append("  -> For predict_and_build/mtriage with half-maps only: half_map=%s half_map=%s" % (half_map_files[0], half_map_files[1]))
             elif len(half_map_files) > 2:
                 file_summary.append("  -> WARNING: More than 2 half maps detected, select the matching pair")
 
     if ligand_cif_files:
         file_summary.append("LIGAND RESTRAINTS (.cif): %s" % ", ".join(ligand_cif_files))
+
+    # Add RECOMMENDED FILES section if best_files are available
+    # This tells the LLM which files to use for iterative workflows
+    if best_files:
+        recommended = []
+        if best_files.get("model"):
+            recommended.append("**USE THIS MODEL:** %s" % os.path.basename(best_files["model"]))
+        if best_files.get("data_mtz"):
+            recommended.append("**USE THIS DATA:** %s" % os.path.basename(best_files["data_mtz"]))
+        if best_files.get("map_coeffs_mtz"):
+            recommended.append("**USE FOR MAPS/LIGANDFIT:** %s" % os.path.basename(best_files["map_coeffs_mtz"]))
+        if best_files.get("map"):
+            recommended.append("**USE THIS MAP:** %s" % os.path.basename(best_files["map"]))
+
+        if recommended:
+            file_summary.append("")
+            file_summary.append(">>> RECOMMENDED FILES FOR NEXT STEP <<<")
+            file_summary.extend(recommended)
+            file_summary.append("(These are the latest/best files from previous cycles - always use these for refinement!)")
+            file_summary.append("**EXCEPTION:** phenix.autosol MUST use the ORIGINAL input data file (not PHASER output). PHASER.1.mtz loses anomalous signal needed for SAD phasing.")
 
     # === WORKFLOW STATE SECTION ===
     workflow_section = ""
@@ -498,9 +660,32 @@ You MUST choose from the valid programs above, or set "stop": true.
         if workflow_state.get("automation_path"):
             workflow_section += "\nAutomation path: %s\n" % workflow_state["automation_path"]
 
-            if workflow_state["automation_path"] == "stepwise":
-                if "predict_and_build" in valid_list:
-                    workflow_section += "NOTE: Use predict_and_build with strategy: {\"stop_after_predict\": true}\n"
+            # Only show stop_after_predict guidance for cryo-EM stepwise workflow
+            # For X-ray, predict_and_build should run the full workflow (prediction + MR + building)
+            experiment_type = workflow_state.get("experiment_type", "")
+            if (workflow_state["automation_path"] == "stepwise" and
+                experiment_type == "cryoem" and
+                "predict_and_build" in valid_list):
+                workflow_section += "NOTE: Use predict_and_build with strategy: {\"stop_after_predict\": true}\n"
+
+        # Add program descriptions so LLM understands each program's purpose
+        try:
+            from libtbx.langchain.knowledge.yaml_loader import get_program
+        except ImportError:
+            try:
+                from knowledge.yaml_loader import get_program
+            except ImportError:
+                get_program = None
+        if get_program:
+            desc_lines = []
+            for prog in workflow_state.get("valid_programs", []):
+                if prog == "STOP":
+                    continue
+                prog_def = get_program(prog)
+                if prog_def and prog_def.get("description"):
+                    desc_lines.append("  - %s: %s" % (prog, prog_def["description"]))
+            if desc_lines:
+                workflow_section += "\nProgram descriptions:\n" + "\n".join(desc_lines) + "\n"
 
         # Add recommendations section if available
         recommendations = format_recommendations_for_prompt(workflow_state)
@@ -552,25 +737,58 @@ You MUST choose from the valid programs above, or set "stop": true.
                 continue
 
             # Detect failure in result string
-            if str(result).startswith("FAILED") or "Sorry" in str(result):
-                error = result
+            # Empty/None results indicate timeout or crash (no output)
+            result_str = str(result).strip() if result else ""
+            if (result_str.startswith("FAILED") or "Sorry" in result_str
+                or not result_str or result_str == "None"):
+                error = result_str if result_str else "No output (timeout or crash)"
 
             if len(str(result)) > 100:
                 result = str(result)[:100] + "..."
 
-            line = "- Cycle %s: %s" % (cycle_num, program)
+            line = "- Cycle %s: %s" % (escape_percent(cycle_num), escape_percent(program))
             if error:
-                line += " [ERROR: %s]" % str(error)[:80]
+                line += " [ERROR: %s]" % escape_percent(str(error)[:80])
                 last_error = str(error)
                 last_failed_command = command
                 last_failed_program = program
             else:
-                line += " -> %s" % result
+                line += " -> %s" % escape_percent(result)
             history_str += line + "\n"
     else:
         history_str = "No previous history. This is the FIRST cycle."
 
     # === RETRY CONTEXT ===
+    # Count consecutive failures of the SAME program (for pivot logic)
+    consecutive_same_failures = 0
+    if history and last_failed_program:
+        for h in reversed(history):
+            if not isinstance(h, dict):
+                break
+            prog = h.get('program', '')
+            result = str(h.get('result', h.get('summary', ''))).strip()
+            is_fail = (result.upper().startswith("FAIL") or
+                       "Sorry" in result or
+                       ("ERROR" in result.upper() and
+                        "WITHOUT ERROR" not in result.upper()) or
+                       not result or result == "None")
+            if is_fail and prog == last_failed_program:
+                consecutive_same_failures += 1
+            else:
+                break  # streak broken
+
+    # Detect terminal errors (no retry can fix these)
+    is_terminal_error = False
+    if last_error:
+        _le = last_error.lower()
+        is_terminal_error = any(x in _le for x in [
+            "traceback (most recent call last)",
+            "polymer crosses special position",
+            "segmentation fault",
+            "killed",
+            "core dumped",
+        ])
+
     retry_msg = ""
     if previous_attempts:
         last = previous_attempts[-1]
@@ -584,29 +802,147 @@ YOU MUST FIX THIS. Try a DIFFERENT approach:
 - Choose a valid program from the workflow state
 - Use different files
 """ % (
-            last.get('error', 'unknown'),
-            last.get('command', 'none')
+            escape_percent(last.get('error', 'unknown')),
+            escape_percent(last.get('command', 'none'))
         )
 
     # === RUNTIME ERROR CONTEXT ===
     runtime_error_msg = ""
     if last_error and not previous_attempts:
-        is_phil_error = any(x in last_error.lower() for x in [
-            "phil parameter", "unknown parameter", "unrecognized", "invalid keyword",
-            "not a valid", "syntax error", "unexpected"
+        last_error_lower = last_error.lower()
+
+        # Check for specific error types
+        is_phil_error = any(x in last_error_lower for x in [
+            "phil parameter", "unknown parameter", "unrecognized", "not recognized",
+            "invalid keyword", "not a valid", "syntax error", "unexpected",
+            "arguments are not recognized", "ambiguous parameter"
         ])
 
-        if is_phil_error:
+        is_rfree_error = any(x in last_error_lower for x in [
+            "r-free", "rfree", "r_free", "free_flags", "test set",
+            "no test reflections", "fraction of test"
+        ])
+
+        is_resolution_error = any(x in last_error_lower for x in [
+            "resolution", "d_min", "high_resolution"
+        ])
+
+        is_file_error = any(x in last_error_lower for x in [
+            "file not found", "no such file", "cannot open", "does not exist",
+            "missing file", "input file"
+        ])
+
+        # Escape % in error messages to prevent format string issues
+        safe_error = escape_percent(last_error[:200])
+        safe_program = escape_percent(last_failed_program or "unknown")
+
+        if is_terminal_error:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - TERMINAL ERROR !!!
+Program: %s
+Error: "%s"
+
+This error CANNOT be fixed by retrying with different parameters.
+You MUST choose a DIFFERENT program or a different approach entirely.
+Consider whether a prerequisite step (e.g., refinement to standardize data)
+might help, or try an alternative workflow path.
+""" % (safe_program, safe_error)
+
+        elif is_phil_error and consecutive_same_failures >= 2:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - PHIL SYNTAX ERROR (REPEATED %d TIMES) !!!
+Program: %s
+Error: "%s"
+
+This program has failed %d consecutive times with parameter errors.
+Retrying with tweaked parameters is NOT working.
+You MUST choose a DIFFERENT program or approach.
+Consider whether a prerequisite step (e.g., running phenix.refine first
+to create a standard MTZ) would resolve the underlying issue.
+""" % (consecutive_same_failures, safe_program, safe_error,
+       consecutive_same_failures)
+
+        elif is_phil_error:
             runtime_error_msg = """
 !!! PREVIOUS CYCLE FAILED - PHIL SYNTAX ERROR !!!
 Program: %s
 Error: "%s"
 
-THIS IS A SYNTAX ERROR - DO NOT SWITCH PROGRAMS!
-Retry with corrected parameter names.
-""" % (last_failed_program or "unknown", last_error[:200])
-        else:
+This is a parameter syntax error. Remove or correct the unrecognized
+parameter(s) named in the error message and retry.
+If the error persists after correction, switch to a different program.
+""" % (safe_program, safe_error)
+
+        elif is_rfree_error and consecutive_same_failures >= 2:
             runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - R-FREE FLAG ISSUE (REPEATED %d TIMES) !!!
+Program: %s
+Error: "%s"
+
+This program has failed %d consecutive times with R-free flag errors.
+You MUST choose a DIFFERENT program or approach.
+""" % (consecutive_same_failures, safe_program, safe_error,
+       consecutive_same_failures)
+
+        elif is_rfree_error:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - R-FREE FLAG ISSUE !!!
+Program: %s
+Error: "%s"
+
+THIS IS AN R-FREE FLAG ERROR.
+The system handles R-free flag generation automatically based on whether the
+MTZ already has R-free flags.  Do NOT set generate_rfree_flags=True — the
+BUILD node will add it only when needed.
+If the error persists, the MTZ may already have R-free flags from a previous
+refinement or the input data.  Try re-running without generate_rfree_flags.
+If the error still persists, switch to a different program.
+""" % (safe_program, safe_error)
+
+        elif is_resolution_error and consecutive_same_failures >= 2:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - RESOLUTION ISSUE (REPEATED %d TIMES) !!!
+Program: %s
+Error: "%s"
+
+This program has failed %d consecutive times with resolution errors.
+You MUST choose a DIFFERENT program or approach.
+""" % (consecutive_same_failures, safe_program, safe_error,
+       consecutive_same_failures)
+
+        elif is_resolution_error:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - RESOLUTION ISSUE !!!
+Program: %s
+Error: "%s"
+
+THIS IS A RESOLUTION ERROR. Add or fix the resolution parameter in strategy.
+If the error persists, switch to a different program.
+""" % (safe_program, safe_error)
+
+        elif is_file_error:
+            runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED - FILE NOT FOUND !!!
+Program: %s
+Error: "%s"
+
+A required file was not found. Check the FILE INVENTORY and use only files that exist.
+""" % (safe_program, safe_error)
+
+        else:
+            if consecutive_same_failures >= 2:
+                runtime_error_msg = """
+!!! PREVIOUS CYCLE FAILED (REPEATED %d TIMES) !!!
+Program: %s
+Error: "%s"
+
+This program has failed %d consecutive times.
+You MUST choose a DIFFERENT program or approach.
+Consider whether a prerequisite step might resolve the underlying issue.
+""" % (consecutive_same_failures, safe_program, safe_error,
+       consecutive_same_failures)
+            else:
+                runtime_error_msg = """
 !!! PREVIOUS CYCLE FAILED !!!
 Program: %s
 Error: "%s"
@@ -615,7 +951,7 @@ You must adapt:
 1. Add/change strategy parameters
 2. Try a different valid program
 3. Use different files
-""" % (last_failed_program or "unknown", last_error[:200])
+""" % (safe_program, safe_error)
 
     # === RESOLUTION HINT ===
     resolution_hint = ""
@@ -632,13 +968,25 @@ You must adapt:
 ### USER ADVICE (FOLLOW THIS)
 %s
 
-""" % user_advice
+**IMPORTANT**: Extract parameters from the user advice above ONLY when they apply to the
+program you are currently selecting. Do NOT carry over parameters that belong to a different
+program. For example:
+- If user mentions wavelength 0.9792 AND you selected phenix.autosol → add to strategy: "wavelength": 0.9792
+- If user mentions Se atoms AND you selected phenix.autosol → add to strategy: "atom_type": "Se"
+- If user mentions resolution 2.5 Å AND the selected program uses resolution → add to strategy: "resolution": 2.5
+- If user mentions refinement parameters (e.g. number_of_macro_cycles) AND you selected phenix.ligandfit → DO NOT add them; they don't apply
+
+""" % escape_percent(user_advice)
+
+    # Directives section - show extracted structured directives
+    directives_section = ""
+    if directives:
+        directives_section = _format_directives_for_prompt(directives)
 
     user_msg = """
-%s%s
-%s
+%s%s%s
 ### CURRENT STATUS
-
+%s
 Log Analysis: %s
 
 ### FILE INVENTORY
@@ -653,6 +1001,7 @@ Based on the workflow state, user advice, and available files, what is the next 
 Output JSON only.
 """ % (
         user_advice_section,
+        directives_section,
         workflow_section,
         metrics_section,
         json.dumps(analysis, indent=2) if analysis else "No analysis yet (first run)",
@@ -664,3 +1013,49 @@ Output JSON only.
     )
 
     return SYSTEM_PROMPT, user_msg
+
+
+# =============================================================================
+# AGENT SESSION ASSESSMENT PROMPT
+# =============================================================================
+
+AGENT_SESSION_ASSESSMENT_PROMPT = """You are a senior crystallographer reviewing the results of an automated structure determination workflow.
+
+Analyze the session summary below and provide a brief assessment covering:
+
+1. **Input Data Quality**: What is the quality of the input data? (resolution, completeness, any issues)
+
+2. **Goal and Strategy**: What was the user's goal and what strategy did the agent use to achieve it?
+
+3. **Strategy Assessment**: Was the strategy appropriate for the data and goal? Was the goal achieved?
+
+4. **Current Status**: What is the current state of the structure/analysis? Is it ready for further analysis or deposition?
+
+5. **Next Steps**: What are appropriate next steps? (e.g., more refinement, ligand fitting, validation, deposition)
+
+**IMPORTANT**: Check the "Stop Condition" in the session summary. If the session was a FOCUSED TASK or TUTORIAL
+(e.g., "stop after xtriage", "stop after density modification", "this is a focused task"), then:
+- The workflow was INTENTIONALLY limited - this is SUCCESS, not failure
+- Do NOT suggest the workflow is "stalled", "incomplete", or "failed"
+- Assess whether the specific focused task was completed successfully
+- For "Next Steps", suggest what the user might do OUTSIDE this automated session
+
+Keep your assessment concise (3-5 sentences per section). Focus on practical insights.
+
+=== SESSION SUMMARY ===
+{session_summary}
+=== END SESSION SUMMARY ===
+
+**Superseded failures**: Steps marked [SUPERSEDED] were resolved by later successful steps — do not report them as critical issues.
+
+Provide your assessment in Markdown format with the headers above."""
+
+
+def get_agent_session_assessment_prompt():
+    """
+    Get the prompt template for assessing an agent session.
+
+    Returns:
+        str: The assessment prompt template
+    """
+    return AGENT_SESSION_ASSESSMENT_PROMPT

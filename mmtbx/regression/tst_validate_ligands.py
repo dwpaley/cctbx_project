@@ -8,30 +8,36 @@ from libtbx.test_utils import approx_equal
 from iotbx.cli_parser import run_program
 from mmtbx.programs import validate_ligands as val_lig
 
+from rdkit import RDLogger
+lg = RDLogger.logger()
+lg.setLevel(RDLogger.CRITICAL) # Only show critical errors
+
 # ------------------------------------------------------------------------------
 
 def run():
-  run_test1()
-  run_test2()
-  run_test3()
-  #run_test4()
-  run_test5()
-  run_test6()
+  run_test01()
+  run_test02()
+  run_test03()
+  run_test04()
+  run_test05()
+  run_test06()
 
 # ------------------------------------------------------------------------------
 
-def run_test1():
+def run_test01():
   '''
   Several tests:
     - check if iselection for ligand PG5 (chain A resseq 201) is correct
     - count clashes involving ligand and calculate ligand clashscore
     - check geometry outliers
   '''
+  print('test01')
   pdb_fname = libtbx.env.find_in_repositories(
     relative_path="mmtbx/regression/pdbs/one_chain_ligand_water.pdb",
     test=os.path.isfile)
-  args=[pdb_fname]
-  print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
+
+  args=[pdb_fname, 'save_reduce2_model=True']
+  #print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
   try:
     result = run_program(program_class=val_lig.Program,args=args,
      logger = null_out())
@@ -44,15 +50,20 @@ def run_test1():
   lr = vl_manager[0]
   assert (lr.id_str == 'PG5 A 201')
 
+  pdb_inp = iotbx.pdb.input(result.working_model_fn, source_info=None)
+  model = mmtbx.model.manager(
+    model_input=pdb_inp,
+    log = null_out())
+  model.process(make_restraints=True)
+  ligand_isel = model.iselection('resname PG5 and chain A and resseq 201')
+
   # test iselection
-  assert(list(lr.ligand_isel) == [190, 191, 192, 193, 194, 195, 196, 197, 198, 199,
-    200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214,
-    215, 216, 217, 218, 219])
+  assert (lr.ligand_isel == ligand_isel)
 
   # Number of clashes and clashscore
   clashes_result = lr.get_overlaps()
   assert(clashes_result.n_clashes == 5)
-  assert approx_equal(clashes_result.clashscore, 27.6, eps=0.5)
+  assert approx_equal(clashes_result.clashscore, 25.6, eps=0.5)
   #
   # Geometry deviations
   rmsd_result = lr.get_rmsds()
@@ -64,35 +75,34 @@ def run_test1():
   assert(rmsd_result.angle_n_outliers == 0)
   assert approx_equal(rmsd_result.dihedral_rmsd, 32.6, eps=0.5)
 
-  os.remove('one_chain_ligand_water_newH.cif')
-  os.remove('one_chain_ligand_water_newH.txt')
+  if os.path.isfile('one_chain_ligand_water_newH.cif'):
+    os.remove('one_chain_ligand_water_newH.cif')
 
 # ------------------------------------------------------------------------------
 
-def run_test2():
+def run_test02():
   '''
   Test
   - occupancy determination for ligands
   - adp determination for ligands and neighbors
   '''
+  print('test02')
   pdb_fname = libtbx.env.find_in_repositories(
     relative_path="mmtbx/regression/pdbs/two_chains_ligand_water.pdb",
     test=os.path.isfile)
   args=[pdb_fname]
-  print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
+  #print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
   try:
     result = run_program(program_class=val_lig.Program,args=args,
      logger = null_out())
   except Exception as e:
     msg = traceback.format_exc()
+    print(msg)
 
   vl_manager = result.ligand_manager
   tst_occupancies(vl_manager = vl_manager)
   tst_adps(vl_manager = vl_manager)
   tst_rmsds(vl_manager = vl_manager)
-
-  os.remove('two_chains_ligand_water_newH.cif')
-  os.remove('two_chains_ligand_water_newH.txt')
 
 # ------------------------------------------------------------------------------
 
@@ -173,13 +183,14 @@ def tst_adps(vl_manager):
 
 # ------------------------------------------------------------------------------
 
-def run_test3():
+def run_test03():
   '''
   Test
   - CC calculation for three ligands
   - ADP calculations for ligands
   - occupancy calculations for ligands
   '''
+  print('test03')
   mtz_fname = libtbx.env.find_in_repositories(
     relative_path="phenix_regression/reflection_files/1avd.mtz",
     test=os.path.isfile)
@@ -188,7 +199,7 @@ def run_test3():
     test=os.path.isfile)
   args=[pdb_fname, mtz_fname]
   #
-  print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
+  #print("mmtbx.development.validate_ligands %s" %(" ".join(args)))
   try:
     result = run_program(program_class=val_lig.Program,args=args,
      logger = null_out())
@@ -202,10 +213,11 @@ def run_test3():
     id_str = lr.id_str
     adps = lr.get_adps()
     ccs = lr.get_ccs()
+    #print(ccs.rscc)
     clashes_result = lr.get_overlaps()
     #
     if (id_str.strip() == 'NAG A 600'):
-      assert approx_equal(ccs.cc_2fofc, 0.87, eps=0.03)
+      assert approx_equal(ccs.rscc, 0.87, eps=0.03)
       #
       assert approx_equal(occs.occ_min, 0, eps=0.01)
       assert approx_equal(occs.occ_max, 1, eps=0.01)
@@ -223,7 +235,7 @@ def run_test3():
       assert approx_equal(clashes_result.clashscore, 9.4, eps=0.5)
       #
     if (id_str.strip() == 'BTN A 400'):
-      assert approx_equal(ccs.cc_2fofc, 0.94, eps=0.03)
+      assert approx_equal(ccs.rscc, 0.94, eps=0.03)
       #
       assert approx_equal(occs.occ_mean, 1, eps=0.01)
       #
@@ -250,7 +262,7 @@ def run_test3():
       assert approx_equal(rmsd_result.planarity_rmsd, 0.02, eps=0.05)
       #
     if (id_str.strip() == 'BTN B 401'):
-      assert approx_equal(ccs.cc_2fofc, 0.95, eps=0.03)
+      assert approx_equal(ccs.rscc, 0.95, eps=0.03)
       #
       assert approx_equal(occs.occ_mean, 1, eps=0.01)
       #
@@ -260,10 +272,10 @@ def run_test3():
       #
       assert approx_equal(adps.b_min_within, 4.00, eps=0.01)
       assert approx_equal(adps.b_max_within, 75.42, eps=0.01)
-      assert approx_equal(adps.b_mean_within, 28.16, eps=0.02)
+      assert approx_equal(adps.b_mean_within, 28.20, eps=0.02)
       #
       assert(clashes_result.n_clashes == 6)
-      assert approx_equal(clashes_result.clashscore, 18.5, eps=0.5)
+      assert approx_equal(clashes_result.clashscore, 19.3, eps=0.5)
 
       #print(round(clashes_result.clashscore,1))
       #print(adps.b_min_within)
@@ -275,9 +287,6 @@ def run_test3():
       #print(adps.b_min)
       #print(adps.b_max)
       #print(adps.b_mean)
-
-  os.remove('pdb1avd_newH.txt')
-  os.remove('pdb1avd_newH.cif')
 
 #def tst_get_overlaps(vl_manager):
 #  '''
@@ -302,16 +311,17 @@ def run_test3():
 
 # ------------------------------------------------------------------------------
 
-def run_test4():
+def run_test04():
   '''
   Test if ligands with 5-letter ID are processed properly
   from PDB model 7has
   '''
+  print('test04')
   model_fn = "tst_4_fragment.cif"
   with open(model_fn, "w") as f:
     f.write(cif_str_tst_4)
   args = [model_fn]
-  print("mmtbx.development.validate_ligands %s run_reduce2=False" % model_fn)
+  #print("mmtbx.development.validate_ligands %s run_reduce2=False" % model_fn)
   try:
     result = run_program(program_class=val_lig.Program,args=args,
      logger = null_out())
@@ -336,21 +346,20 @@ def run_test4():
     assert approx_equal(adps.b_mean_within, 42.45, eps=0.02)
   #
   os.remove(model_fn)
-  os.remove('tst_4_fragment_newH.cif')
-  os.remove('tst_4_fragment_newH.txt')
 
 # ------------------------------------------------------------------------------
 
-def run_test5():
+def run_test05():
   '''
   Test if ligand with two conformers with different names is processed correctly
   from PDB model 4d3w
   '''
+  print('test05')
   model_fn = "tst_5.pdb"
   with open(model_fn, "w") as f:
     f.write(pdb_str_tst_5)
   args = [model_fn]
-  print("mmtbx.development.validate_ligands %s" % model_fn)
+  #print("mmtbx.development.validate_ligands %s" % model_fn)
   try:
     result = run_program(program_class=val_lig.Program,args=args,
      logger = null_out())
@@ -363,12 +372,11 @@ def run_test5():
     assert (lr.id_str in ['ANGA B   1', 'BA2G B   1', 'GAL B   2'])
   #
   os.remove(model_fn)
-  os.remove('tst_5_newH.cif')
-  os.remove('tst_5_newH.txt')
 
 # ------------------------------------------------------------------------------
 
-def run_test6():
+def run_test06():
+  print('test06')
   pdb_str = '''
 CRYST1   14.103   13.596   12.544  90.00  90.00  90.00 P 1
 SCALE1      0.070907  0.000000  0.000000        0.00000

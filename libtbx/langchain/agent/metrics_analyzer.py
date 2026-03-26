@@ -16,7 +16,13 @@ from __future__ import absolute_import, division, print_function
 import re
 
 # Import YAML-driven evaluator
-from libtbx.langchain.agent.metric_evaluator import analyze_refinement_trend
+try:
+    from libtbx.langchain.agent.metric_evaluator import analyze_refinement_trend
+except ImportError:
+    try:
+        from agent.metric_evaluator import analyze_refinement_trend
+    except ImportError:
+        analyze_refinement_trend = None
 
 
 # =============================================================================
@@ -66,33 +72,53 @@ def derive_metrics_from_history(history):
             }
 
             # Extract from analysis dict if present
+            # Coerce via _safe_float: JSON round-tripping can turn
+            # floats into strings (e.g. 0.385 → "0.385"), which
+            # causes TypeError in downstream arithmetic.
             analysis = entry.get("analysis", {})
             if isinstance(analysis, dict):
-                metrics["r_free"] = analysis.get("r_free")
-                metrics["r_work"] = analysis.get("r_work")
-                metrics["tfz"] = analysis.get("tfz")
-                metrics["llg"] = analysis.get("llg")
-                metrics["resolution"] = analysis.get("resolution")
-                metrics["map_cc"] = analysis.get("map_cc")
+                metrics["r_free"] = _safe_float(analysis.get("r_free"))
+                metrics["r_work"] = _safe_float(analysis.get("r_work"))
+                metrics["tfz"] = _safe_float(analysis.get("tfz"))
+                metrics["llg"] = _safe_float(analysis.get("llg"))
+                metrics["resolution"] = _safe_float(analysis.get("resolution"))
+                metrics["map_cc"] = _safe_float(analysis.get("map_cc"))
 
-            # Also check result/summary for metrics (fallback)
+            # Also check result/summary/analysis for metrics (fallback)
             result_text = str(entry.get("result", "") or entry.get("summary", ""))
+            # analysis may be a text string (FINAL QUALITY METRICS REPORT format)
+            # or a dict — include it in the search text either way
+            _analysis = entry.get("analysis", "")
+            if isinstance(_analysis, str) and _analysis:
+                result_text = result_text + "\n" + _analysis
 
-            # Only fill in missing values from result text
+            # Broad r_free pattern: matches "R-free:", "R Free:", "R_Free:", "R Free ="
+            _RFREE_PAT = r"R[- _][Ff]ree[:\s=]+([0-9.]+)"
+            _RWORK_PAT = r"R[- _][Ww]ork[:\s=]+([0-9.]+)"
+
+            # Only fill in missing values from result/analysis text
             if not metrics["r_free"]:
-                metrics["r_free"] = _extract_float(result_text, r"R-free[:\s=]+([0-9.]+)")
+                metrics["r_free"] = _extract_float(result_text, _RFREE_PAT)
             # Try autobuild table format: "SOLUTION  CYCLE     R        RFREE"
             # followed by data row like "1         1      0.21        0.25"
             if not metrics["r_free"]:
                 metrics["r_free"] = _extract_autobuild_rfree(result_text)
             if not metrics["r_work"]:
-                metrics["r_work"] = _extract_float(result_text, r"R-work[:\s=]+([0-9.]+)")
+                metrics["r_work"] = _extract_float(result_text, _RWORK_PAT)
             if not metrics["tfz"]:
                 metrics["tfz"] = _extract_float(result_text, r"TFZ[=:\s]+([0-9.]+)")
             if not metrics["llg"]:
                 metrics["llg"] = _extract_float(result_text, r"LLG[=:\s]+([0-9.]+)")
             if not metrics["map_cc"]:
-                metrics["map_cc"] = _extract_float(result_text, r"(?:map.model.CC|CC_mask|CC)[:\s=]+([0-9.]+)")
+                # Try multiple patterns for map_cc extraction
+                # Pattern 1: CC_mask (the actual format from real_space_refine)
+                metrics["map_cc"] = _extract_float(result_text, r"CC_mask\s*[:=]\s*([0-9.]+)")
+                # Pattern 2: Map-CC or map_CC
+                if not metrics["map_cc"]:
+                    metrics["map_cc"] = _extract_float(result_text, r"[Mm]ap[-_\s]?CC\s*[:=]\s*([0-9.]+)")
+                # Pattern 3: Model-vs-map CC
+                if not metrics["map_cc"]:
+                    metrics["map_cc"] = _extract_float(result_text, r"[Mm]odel[-_\s]?vs[-_\s]?map\s+CC\s*[:=]?\s*([0-9.]+)")
 
             # Detect program from command if not in entry
             if metrics["program"] == "unknown":
@@ -115,6 +141,21 @@ def _extract_float(text, pattern):
         except (ValueError, IndexError):
             pass
     return None
+
+
+def _safe_float(val):
+    """Convert to float or return None.
+
+    JSON round-tripping can turn float values into strings
+    (e.g. 0.385 → "0.385").  All numeric metrics from history
+    dicts must be coerced before arithmetic or formatting.
+    """
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return None
 
 
 def _extract_autobuild_rfree(text):
@@ -167,31 +208,20 @@ def _extract_autobuild_rfree(text):
 
 
 def _detect_program_from_command(cmd):
-    """Detect program name from command string."""
+    """Detect program name from command string.
+
+    Delegates to log_parsers.detect_program() which uses YAML-configured
+    markers. Command strings contain program names (e.g., "phenix.refine")
+    so the same markers work for both log and command detection.
+    """
     if not cmd:
         return "unknown"
-    cmd_lower = cmd.lower()
-
-    programs = [
-        "phenix.real_space_refine",  # Check before refine
-        "phenix.refine",
-        "phenix.phaser",
-        "phenix.xtriage",
-        "phenix.mtriage",
-        "phenix.predict_and_build",
-        "phenix.ligandfit",
-        "phenix.pdbtools",
-        "phenix.autobuild",
-        "phenix.autosol",
-        "phenix.dock_in_map",
-        "phenix.process_predicted_model",
-    ]
-
-    for prog in programs:
-        if prog in cmd_lower:
-            return prog
-
-    return "unknown"
+    try:
+        from phenix.phenix_ai.log_parsers import detect_program
+        result = detect_program(cmd)
+    except ImportError:
+        result = None
+    return result or "unknown"
 
 
 def _parse_metrics_from_string(text):
@@ -238,7 +268,7 @@ def analyze_metrics_trend(metrics_history, resolution=None, experiment_type="xra
         }
     """
     # Use YAML-driven evaluator
-    if use_yaml_evaluator:
+    if use_yaml_evaluator and analyze_refinement_trend is not None:
         try:
             return analyze_refinement_trend(metrics_history, experiment_type, resolution)
         except Exception as e:
@@ -281,7 +311,7 @@ def _analyze_xray_trend(metrics_history, resolution, result):
     # Also count 'unknown' as potentially refine if it has r_free
     consecutive = 0
     for m in reversed(metrics_history):
-        prog = m.get("program", "").lower()
+        prog = (m.get("program") or "").lower()
         has_r_free = m.get("r_free") is not None
         if "refine" in prog and "real_space" not in prog:
             consecutive += 1
@@ -294,13 +324,13 @@ def _analyze_xray_trend(metrics_history, resolution, result):
 
     # Extract R-free values from refine cycles (or unknown with r_free in refine context)
     # First, identify if we're in a refine-dominated workflow
-    refine_count = sum(1 for m in metrics_history if "refine" in m.get("program", "").lower())
+    refine_count = sum(1 for m in metrics_history if "refine" in (m.get("program") or "").lower())
     in_refine_context = refine_count > 0
 
     r_free_values = []
     for m in metrics_history:
-        prog = m.get("program", "").lower()
-        r_free = m.get("r_free")
+        prog = (m.get("program") or "").lower()
+        r_free = _safe_float(m.get("r_free"))
         if r_free is None:
             continue
 
@@ -409,8 +439,8 @@ def _analyze_xray_trend(metrics_history, resolution, result):
             result["recommendation"] = "stop"
             return result
 
-    # 3. EXCESSIVE REFINEMENT: 8+ consecutive refines (was 5, now more patience)
-    if consecutive >= 8:
+    # 3. EXCESSIVE REFINEMENT: 5+ consecutive refines
+    if consecutive >= 5:
         result["should_stop"] = True
         result["reason"] = "EXCESSIVE: %d consecutive refinement cycles" % consecutive
         result["recommendation"] = "stop"
@@ -434,7 +464,7 @@ def _analyze_cryoem_trend(metrics_history, result):
     # Count consecutive real_space_refine at end of history
     consecutive = 0
     for m in reversed(metrics_history):
-        prog = m.get("program", "").lower()
+        prog = (m.get("program") or "").lower()
         if "real_space" in prog:
             consecutive += 1
         else:
@@ -444,9 +474,11 @@ def _analyze_cryoem_trend(metrics_history, result):
     # Extract CC values from real_space_refine cycles
     rsr_metrics = [
         m for m in metrics_history
-        if "real_space" in m.get("program", "").lower()
+        if "real_space" in (m.get("program") or "").lower()
     ]
-    cc_values = [m["map_cc"] for m in rsr_metrics if m.get("map_cc") is not None]
+    cc_values = [_safe_float(m["map_cc"]) for m in rsr_metrics
+                 if m.get("map_cc") is not None]
+    cc_values = [v for v in cc_values if v is not None]
     result["map_cc_trend"] = cc_values[-5:]
 
     if len(cc_values) < 1:
@@ -492,8 +524,8 @@ def _analyze_cryoem_trend(metrics_history, result):
             result["recommendation"] = "stop"
             return result
 
-    # 3. EXCESSIVE: 8+ consecutive real_space_refine (was 5, now more patience)
-    if consecutive >= 8:
+    # 3. EXCESSIVE: 5+ consecutive real_space_refine
+    if consecutive >= 5:
         result["should_stop"] = True
         result["reason"] = "EXCESSIVE: %d consecutive refinement cycles" % consecutive
         result["recommendation"] = "stop"
@@ -522,8 +554,9 @@ def get_latest_resolution(metrics_history):
         float or None: Resolution in Angstroms
     """
     for m in reversed(metrics_history):
-        if m.get("resolution"):
-            return m["resolution"]
+        res = _safe_float(m.get("resolution"))
+        if res is not None:
+            return res
     return None
 
 
@@ -537,7 +570,9 @@ def get_best_r_free(metrics_history):
     Returns:
         float or None: Best R-free value
     """
-    r_free_values = [m["r_free"] for m in metrics_history if m.get("r_free") is not None]
+    r_free_values = [_safe_float(m["r_free"]) for m in metrics_history
+                     if m.get("r_free") is not None]
+    r_free_values = [v for v in r_free_values if v is not None]
     if r_free_values:
         return min(r_free_values)
     return None
@@ -554,8 +589,9 @@ def get_latest_r_free(metrics_history):
         float or None: Latest R-free value
     """
     for m in reversed(metrics_history):
-        if m.get("r_free"):
-            return m["r_free"]
+        val = _safe_float(m.get("r_free"))
+        if val is not None:
+            return val
     return None
 
 
@@ -570,8 +606,9 @@ def get_latest_map_cc(metrics_history):
         float or None: Latest CC value
     """
     for m in reversed(metrics_history):
-        if m.get("map_cc"):
-            return m["map_cc"]
+        val = _safe_float(m.get("map_cc"))
+        if val is not None:
+            return val
     return None
 
 

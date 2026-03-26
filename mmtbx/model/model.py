@@ -47,7 +47,6 @@ from mmtbx.geometry_restraints.torsion_restraints.torsion_ncs import torsion_ncs
 from mmtbx.refinement import print_statistics
 from mmtbx.refinement import anomalous_scatterer_groups
 from mmtbx.refinement import geometry_minimization
-import cctbx.geometry_restraints.nonbonded_overlaps as nbo
 import collections
 
 from mmtbx.rotamer import nqh
@@ -2351,12 +2350,14 @@ class manager(object):
     g = self.get_ncs_groups()
     return g is not None and len(g)>0
 
-  def search_for_ncs(self, params=None, show_groups=False, ncs_phil_groups=None):
+  def search_for_ncs(self, params=None, show_groups=False, ncs_phil_groups=None, log=None):
+    if log == None:
+      log = self.log
     self._ncs_obj = iotbx.ncs.input(
       hierarchy       = self.get_hierarchy(),
       ncs_phil_groups = ncs_phil_groups,
       params          = params,
-      log             = self.log)
+      log             = log)
     if(self._ncs_obj is not None):
       self._ncs_groups = self.get_ncs_obj().get_ncs_restraints_group_list()
     self._update_master_sel()
@@ -3681,14 +3682,6 @@ class manager(object):
     result = self._xray_structure.select(~sel)
     return result
 
-  def non_bonded_overlaps(self):
-    assert self.has_hd()
-    return nbo.info(
-      geometry_restraints_manager = self.get_restraints_manager().geometry,
-      macro_molecule_selection    = self.selection("protein or nucleotide"),
-      sites_cart                  = self.get_sites_cart(),
-      hd_sel                      = self.selection("element H or element D"))
-
   def percent_of_single_atom_residues(self, macro_molecule_only=True):
     # XXX Should be a method of pdb.hierarchy
     sizes = flex.int()
@@ -3701,7 +3694,7 @@ class manager(object):
     if(sizes.size()==0): return 0
     return sizes.count(1)*100./sizes.size()
 
-  def select(self, selection):
+  def select(self, selection, exclude_flags=False):
     # what about 3 types of NCS and self._master_sel?
     # XXX ignores IAS
     if isinstance(selection, flex.size_t) or isinstance(selection, flex.int):
@@ -3709,7 +3702,7 @@ class manager(object):
     new_pdb_hierarchy = self._pdb_hierarchy.select(selection, copy_atoms=True)
     sdi = self.scattering_dict_info
     new_refinement_flags = None
-    if(self.refinement_flags is not None):
+    if(self.refinement_flags is not None and not exclude_flags):
       new_refinement_flags = self.refinement_flags.select_detached(
         selection = selection)
     new_restraints_manager = None
@@ -4264,7 +4257,7 @@ class manager(object):
       if(self.riding_h_manager is not None or
          scattering_table in ["n_gaussian","wk1995", "it1992", "electron"]):
         not_hd_sel = ~hd_selection
-        m = m.select(not_hd_sel)
+        m = m.select(not_hd_sel, exclude_flags=True)
     return mmtbx.model.statistics.geometry(
       model           = m,
       fast_clash      = fast_clash,

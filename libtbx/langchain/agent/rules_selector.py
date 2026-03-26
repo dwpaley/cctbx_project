@@ -11,7 +11,7 @@ The selector can:
 4. Provide clear reasoning for each decision
 
 Usage:
-    from agent.rules_selector import RulesSelector
+    from libtbx.langchain.agent.rules_selector import RulesSelector
 
     selector = RulesSelector()
     intent = selector.select_next_action(
@@ -27,6 +27,7 @@ This enables fully automated workflows without LLM involvement.
 from __future__ import absolute_import, division, print_function
 
 import os
+import warnings
 
 # Import dependencies
 from libtbx.langchain.agent.workflow_engine import WorkflowEngine
@@ -34,12 +35,115 @@ from libtbx.langchain.agent.metric_evaluator import MetricEvaluator
 from libtbx.langchain.agent.program_registry import ProgramRegistry
 
 
+# =============================================================================
+# Rules priority loader
+# =============================================================================
+
+_RULES_CONFIG_CACHE = None
+
+def _load_rules_config():
+    """Load rules_config from workflows.yaml shared section.
+
+    Returns dict with keys: default_priority, ligand_priority, state_aliases.
+    Falls back to hardcoded config with DeprecationWarning if YAML fails.
+    """
+    global _RULES_CONFIG_CACHE
+    if _RULES_CONFIG_CACHE is not None:
+        return _RULES_CONFIG_CACHE
+
+    try:
+        try:
+            from libtbx.langchain.knowledge.yaml_loader import load_workflows
+        except ImportError:
+            from knowledge.yaml_loader import load_workflows
+        workflows = load_workflows()
+        config = workflows.get("shared", {}).get("rules_config", {})
+        if config:
+            _RULES_CONFIG_CACHE = config
+            return config
+    except Exception:
+        pass
+
+    warnings.warn(
+        "Could not load rules_config from workflows.yaml; "
+        "using hardcoded fallback.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    _RULES_CONFIG_CACHE = {
+        "default_priority": [
+            "phenix.refine", "phenix.real_space_refine",
+            "phenix.molprobity", "phenix.autobuild",
+            "phenix.predict_and_build", "phenix.phaser",
+        ],
+        "ligand_priority": [
+            "phenix.ligandfit", "phenix.elbow",
+            "phenix.pdbtools", "phenix.refine",
+        ],
+        "state_aliases": {
+            "xray_initial": "analyze",
+            "cryoem_initial": "analyze",
+            "molecular_replacement": "obtain_model",
+        },
+    }
+    return _RULES_CONFIG_CACHE
+
+
+def _get_phase_rules_priority(experiment_type, state_name, files=None):
+    """Load rules_priority for a workflow step from YAML.
+
+    Args:
+        experiment_type: 'xray' or 'cryoem'
+        state_name: Current workflow state/step name
+        files: Dict of categorized files (for conditional priorities)
+
+    Returns:
+        List of program names in priority order, or empty list.
+    """
+    config = _load_rules_config()
+
+    # Handle ligand substring match (not a specific step)
+    if "ligand" in state_name.lower():
+        return config.get("ligand_priority", [])
+
+    # Resolve state aliases
+    aliases = config.get("state_aliases", {})
+    step_name = aliases.get(state_name, state_name)
+
+    # Try to load from the specific workflow step
+    try:
+        try:
+            from libtbx.langchain.knowledge.yaml_loader import load_workflows
+        except ImportError:
+            from knowledge.yaml_loader import load_workflows
+        workflows = load_workflows()
+        wf = workflows.get(experiment_type, {})
+        steps_dict = wf.get("steps") or wf.get("phases") or {}
+        step = steps.get(step_name, {})
+        priority = step.get("rules_priority")
+
+        if priority is not None:
+            # Handle conditional priority (dict with default/when_* keys)
+            if isinstance(priority, dict):
+                if "when_sequence_only" in priority and files:
+                    if files.get("sequence") and not files.get("pdb"):
+                        return priority["when_sequence_only"]
+                return priority.get("default", [])
+            elif isinstance(priority, list):
+                return priority
+    except Exception:
+        pass
+
+    # Fall back to default priority
+    return config.get("default_priority", [])
+
+
 class RulesSelector:
     """
     Deterministic program selector using YAML-defined rules.
 
     Selects the next program based on:
-    1. Current workflow phase
+    1. Current workflow step
     2. Available files
     3. Metrics trend
     4. Quality targets
@@ -251,12 +355,20 @@ class RulesSelector:
         Prioritize among multiple valid programs.
 
         Priority rules:
+        0. Forced program from after_program directive (highest priority)
         1. Programs with priority_when conditions met (from workflow YAML)
         2. Validation programs when metrics are good
         3. Refinement programs when model needs improvement
         4. Building programs when model is missing
         5. Analysis programs at start
         """
+        # Check for forced program from directives (after_program)
+        # The workflow_engine puts this at the front of valid_programs
+        # We check if it's in candidates and select it immediately
+        forced_program = workflow_state.get("forced_program")
+        if forced_program and forced_program in candidates:
+            return forced_program, "User directive: run %s before stopping" % forced_program
+
         # First check for programs with priority_when conditions met
         # These are defined in workflows.yaml and checked by workflow_engine
         program_priorities = workflow_state.get("program_priorities", [])
@@ -264,22 +376,10 @@ class RulesSelector:
             if prog in candidates:
                 return prog, "Priority condition met (from workflow)"
 
-        # Define priority order by context
-        if state_name in ("analyze", "xray_initial", "cryoem_initial"):
-            # At start: prefer analysis
-            priority = [
-                "phenix.xtriage", "phenix.mtriage",
-                "phenix.predict_and_build", "phenix.phaser",
-            ]
-
-        elif state_name in ("validate",):
-            # Validation phase: prefer validation tools
-            priority = [
-                "phenix.molprobity", "phenix.model_vs_data",
-                "phenix.refine", "phenix.real_space_refine",
-            ]
-
-        elif state_name in ("refine",):
+        # Define priority order by context (loaded from workflows.yaml)
+        # Conditional validation logic stays in Python — it's behavioral,
+        # not configuration.
+        if state_name in ("refine",):
             # Refinement: check if we should validate first
             r_free = metrics_trend.get("r_free_trend", [None])[-1] if metrics_trend.get("r_free_trend") else None
             map_cc = metrics_trend.get("map_cc_trend", [None])[-1] if metrics_trend.get("map_cc_trend") else None
@@ -292,40 +392,8 @@ class RulesSelector:
                 if "phenix.molprobity" in candidates:
                     return "phenix.molprobity", "Quality good (CC=%.3f), validating" % map_cc
 
-            # Otherwise continue refinement
-            priority = [
-                "phenix.refine", "phenix.real_space_refine",
-                "phenix.molprobity", "phenix.model_vs_data",
-            ]
-
-        elif state_name in ("obtain_model", "molecular_replacement"):
-            # Model building priority
-            # Note: strong_anomalous check is now handled by program_priorities above
-            if files.get("sequence") and not files.get("pdb"):
-                priority = [
-                    "phenix.predict_and_build",
-                    "phenix.phaser", "phenix.autobuild",
-                ]
-            else:
-                priority = [
-                    "phenix.phaser", "phenix.dock_in_map",
-                    "phenix.predict_and_build", "phenix.autobuild",
-                ]
-
-        elif "ligand" in state_name.lower():
-            # Ligand work
-            priority = [
-                "phenix.ligandfit", "phenix.elbow",
-                "phenix.pdbtools", "phenix.refine",
-            ]
-
-        else:
-            # Default priority
-            priority = [
-                "phenix.refine", "phenix.real_space_refine",
-                "phenix.molprobity", "phenix.autobuild",
-                "phenix.predict_and_build", "phenix.phaser",
-            ]
+        priority = _get_phase_rules_priority(
+            experiment_type, state_name, files)
 
         # Find first candidate in priority list
         for prog in priority:
@@ -341,37 +409,76 @@ class RulesSelector:
         Filters valid_programs based on user preferences. Does not add programs
         that aren't already valid - the workflow state machine controls validity.
 
+        IMPORTANT: This function should only filter when the user gives a SPECIFIC
+        IMMEDIATE instruction (e.g., "run refine now", "use phaser"). For multi-step
+        workflows (e.g., "refine, fit ligand, then refine again"), the directives
+        system handles the sequencing - we should NOT filter here.
+
         Keywords are now defined in programs.yaml under user_advice_keywords.
         """
         advice_lower = user_advice.lower()
 
         # Check for specific program mentions (e.g., "use phaser", "run refine")
+        # BUT only if it looks like an immediate instruction, not a workflow description
+        # Workflow descriptions contain sequencing words or multiple program mentions
+        sequencing_words = [
+            "then", "after", "first", "next", "finally", "before", "followed by",
+            "with", "and then", "including", "include", "plus", "also",
+            "workflow", "sequence", "steps", "primary goal", "goal:",
+        ]
+        is_multi_step = any(word in advice_lower for word in sequencing_words)
+
+        # Also check if multiple programs are mentioned - that's a multi-step workflow
+        programs_mentioned = 0
         for prog in valid_programs:
-            prog_name = prog.replace("phenix.", "").replace("_", " ")
+            if prog == "STOP":
+                continue
+            prog_name = prog.replace("phenix.", "").replace("_", " ").lower()
             if prog_name in advice_lower or prog.lower() in advice_lower:
-                return [prog]  # User specifically wants this
+                programs_mentioned += 1
+        if programs_mentioned > 1:
+            is_multi_step = True
 
-        # Check each valid program's keywords from YAML
-        for prog in valid_programs:
-            keywords = self.program_registry.get_user_advice_keywords(prog)
-            if keywords:
-                for kw in keywords:
-                    if kw.lower() in advice_lower:
-                        return [prog]
+        if not is_multi_step:
+            # Single-step instruction - check for specific program mention
+            for prog in valid_programs:
+                prog_name = prog.replace("phenix.", "").replace("_", " ")
+                # Skip STOP - we handle it specially later to avoid matching "stop" in "stop after..."
+                if prog == "STOP":
+                    continue
+                if prog_name in advice_lower or prog.lower() in advice_lower:
+                    return [prog]  # User specifically wants this
 
-        # Generic keyword fallbacks for common cases
-        if "refine" in advice_lower:
-            refined = [p for p in valid_programs if "refine" in p]
-            if refined:
-                return refined
+            # Check each valid program's keywords from YAML
+            for prog in valid_programs:
+                keywords = self.program_registry.get_user_advice_keywords(prog)
+                if keywords:
+                    for kw in keywords:
+                        if kw.lower() in advice_lower:
+                            return [prog]
 
-        if "valid" in advice_lower or "check" in advice_lower:
-            validated = [p for p in valid_programs if "molprobity" in p or "model_vs_data" in p]
-            if validated:
-                return validated
+        # NOTE: Removed aggressive generic keyword fallbacks (e.g., "refine" -> only refine programs)
+        # These caused problems with multi-step workflows like "refine, fit ligand, refine"
+        # The directives system and LLM handle complex advice better than simple keyword matching.
 
+        # Only treat "stop" as an immediate stop request if it's at the start
+        # or clearly indicates immediate stop (not "stop after X")
+        # Words like "stop after", "stop when", "stop condition" are conditions, not requests
         if "stop" in advice_lower:
-            return ["STOP"] if "STOP" in valid_programs else valid_programs
+            # Check if it's a stop condition vs an immediate stop request
+            stop_condition_patterns = [
+                "stop after",
+                "stop when",
+                "stop once",
+                "stop if",
+                "stop condition",
+                "stop at",
+            ]
+            is_stop_condition = any(pattern in advice_lower for pattern in stop_condition_patterns)
+
+            if not is_stop_condition:
+                # Looks like an immediate stop request (e.g., "please stop", "stop now")
+                return ["STOP"] if "STOP" in valid_programs else valid_programs
 
         return valid_programs
 
@@ -448,7 +555,7 @@ class RulesSelector:
             program == "phenix.predict_and_build" and
             automation_path == "stepwise"
         )
-        data_inputs = {"mtz", "full_map", "half_map", "map", "data"}
+        data_inputs = {"data_mtz", "map_coeffs_mtz", "full_map", "half_map", "map", "data"}
 
         # Get required inputs from registry
         required = self.program_registry.get_required_inputs(program)
@@ -542,13 +649,24 @@ class RulesSelector:
                         model_files.append(f)
             return model_files
 
-        # Default MTZ priority
-        if input_name in ("mtz", "data"):
-            mtz_files = list(files.get("refined_mtz", []))
-            for f in files.get("mtz", []):
+        # Default data_mtz priority (for refinement)
+        if input_name in ("data_mtz", "data"):
+            mtz_files = list(files.get("original_data_mtz", []))
+            for f in files.get("data_mtz", []):
                 if f not in mtz_files:
                     mtz_files.append(f)
             return mtz_files
+
+        # Map coefficients MTZ priority (for ligand fitting)
+        if input_name == "map_coeffs_mtz":
+            coeffs_files = list(files.get("refine_map_coeffs", []))
+            for f in files.get("denmod_map_coeffs", []):
+                if f not in coeffs_files:
+                    coeffs_files.append(f)
+            for f in files.get("map_coeffs_mtz", []):
+                if f not in coeffs_files:
+                    coeffs_files.append(f)
+            return coeffs_files
 
         # Simple mappings for other input types
         mapping = {
@@ -584,7 +702,8 @@ class RulesSelector:
                 basename = os.path.basename(f).lower()
 
                 # Category scores (higher = better)
-                if 'with_ligand' in basename:
+                if 'with_ligand' in basename or (
+                    '_modified' in basename and basename.endswith('.pdb')):
                     category_score = 7000
                 elif '_refine_' in basename or 'refined' in basename:
                     category_score = 6000
@@ -643,8 +762,8 @@ class RulesSelector:
                 strategy["stop_after_predict"] = True
 
         elif program == "phenix.refine":
-            # Use cycle number as output prefix to avoid long filename accumulation
-            strategy["output_prefix"] = "%03d" % cycle_number
+            # Use descriptive prefix: refine_001, refine_002, etc.
+            strategy["output_prefix"] = "refine_%03d" % cycle_number
 
             # Check for twinning
             if history_info.get("twin_law"):
@@ -660,8 +779,8 @@ class RulesSelector:
                 strategy["ordered_solvent"] = True
 
         elif program == "phenix.real_space_refine":
-            # Use cycle number as output prefix to avoid long filename accumulation
-            strategy["output_prefix"] = "%03d" % cycle_number
+            # Use descriptive prefix: rsr_001, rsr_002, etc.
+            strategy["output_prefix"] = "rsr_%03d" % cycle_number
 
             # Run longer in later cycles
             rsr_count = history_info.get("rsr_count", 0)
@@ -752,7 +871,7 @@ if __name__ == "__main__":
         "valid_programs": ["phenix.xtriage"],
         "resolution": 2.0,
     }
-    files = {"mtz": ["data.mtz"], "sequence": ["seq.fa"]}
+    files = {"data_mtz": ["data.mtz"], "sequence": ["seq.fa"]}
 
     intent = selector.select_next_action(workflow_state, files)
     print("X-ray initial:")
@@ -767,7 +886,7 @@ if __name__ == "__main__":
         "valid_programs": ["phenix.refine", "phenix.molprobity", "STOP"],
         "resolution": 2.0,
     }
-    files = {"mtz": ["data.mtz"], "pdb": ["model.pdb"], "refined": ["model_refine_001.pdb"]}
+    files = {"data_mtz": ["data.mtz"], "pdb": ["model.pdb"], "refined": ["model_refine_001.pdb"]}
     metrics_trend = {
         "r_free_trend": [0.30, 0.28, 0.26],
         "improvement_rate": 7.0,

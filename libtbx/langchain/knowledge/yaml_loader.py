@@ -7,7 +7,7 @@ This module loads the YAML configuration files that define:
 - metrics.yaml: Quality metrics and thresholds
 
 Usage:
-    from knowledge.yaml_loader import (
+    from libtbx.langchain.knowledge.yaml_loader import (
         load_programs,
         load_workflows,
         load_metrics,
@@ -36,6 +36,7 @@ _PROGRAMS = None
 _WORKFLOWS = None
 _METRICS = None
 _FILE_CATEGORIES = None
+_RECOVERABLE_ERRORS = None
 
 
 # =============================================================================
@@ -139,6 +140,39 @@ def load_file_categories(force_reload=False):
     return _FILE_CATEGORIES
 
 
+def load_recoverable_errors(force_reload=False):
+    """
+    Load recoverable error definitions from recoverable_errors.yaml.
+
+    Returns:
+        dict: Error type -> error definition, plus data_label_parameters
+    """
+    global _RECOVERABLE_ERRORS
+    if _RECOVERABLE_ERRORS is None or force_reload:
+        _RECOVERABLE_ERRORS = _load_yaml_file("recoverable_errors.yaml")
+    return _RECOVERABLE_ERRORS
+
+
+def reload_all_configs():
+    """
+    Force reload all YAML configuration files.
+
+    Call this at the start of a new agent session or when configs may have changed.
+    This ensures the server picks up any changes to:
+    - programs.yaml
+    - workflows.yaml
+    - metrics.yaml
+    - file_categories.yaml
+    - recoverable_errors.yaml
+    """
+    load_programs(force_reload=True)
+    load_workflows(force_reload=True)
+    load_metrics(force_reload=True)
+    load_file_categories(force_reload=True)
+    load_recoverable_errors(force_reload=True)
+    load_file_categories(force_reload=True)
+
+
 def get_file_category(category_name):
     """
     Get definition for a specific file category.
@@ -178,7 +212,11 @@ def get_program(program_name):
         dict: Program definition or None if not found
     """
     programs = load_programs()
-    return programs.get(program_name)
+    result = programs.get(program_name)
+    # Try with phenix. prefix if bare name didn't match
+    if result is None and program_name and not program_name.startswith("phenix."):
+        result = programs.get("phenix." + program_name)
+    return result
 
 
 def get_all_programs():
@@ -370,19 +408,19 @@ def get_workflow(workflow_name):
     return workflows.get(workflow_name)
 
 
-def get_workflow_phases(workflow_name):
+def get_workflow_steps(workflow_name):
     """
-    Get phases for a workflow.
+    Get steps for a workflow.
 
     Args:
         workflow_name: "xray" or "cryoem"
 
     Returns:
-        dict: Phase name -> phase definition
+        dict: Step name -> step definition
     """
     workflow = get_workflow(workflow_name)
     if workflow:
-        return workflow.get("phases", {})
+        return workflow.get("steps") or workflow.get("phases") or {}
     return {}
 
 
@@ -402,20 +440,20 @@ def get_workflow_targets(workflow_name):
     return {}
 
 
-def get_phase_programs(workflow_name, phase_name):
+def get_step_programs(workflow_name, step_name):
     """
-    Get valid programs for a specific phase.
+    Get valid programs for a specific step.
 
     Args:
         workflow_name: "xray" or "cryoem"
-        phase_name: Phase name (e.g., "refine")
+        step_name: Step name (e.g., "refine")
 
     Returns:
-        list: Program definitions for this phase
+        list: Program definitions for this step
     """
-    phases = get_workflow_phases(workflow_name)
-    phase = phases.get(phase_name, {})
-    return phase.get("programs", [])
+    steps = get_workflow_steps(workflow_name)
+    step = steps.get(step_name, {})
+    return step.get("programs", [])
 
 
 # =============================================================================
@@ -687,8 +725,8 @@ def validate_yaml_files():
         else:
             for name, defn in workflows.items():
                 if name in ["xray", "cryoem"]:
-                    if not defn.get("phases"):
-                        errors.append(f"{name} workflow: missing phases")
+                    if not (defn.get("steps") or defn.get("phases")):
+                        errors.append(f"{name} workflow: missing steps")
     except Exception as e:
         errors.append(f"Error loading workflows.yaml: {e}")
 
@@ -733,8 +771,8 @@ if __name__ == "__main__":
     print(f"Loaded {len(workflows)} workflows:")
     for name in workflows:
         if name in ["xray", "cryoem"]:
-            phases = get_workflow_phases(name)
-            print(f"  - {name}: {len(phases)} phases")
+            steps = get_workflow_steps(name)
+            print(f"  - {name}: {len(steps)} steps")
     print()
 
     # Test metrics loading

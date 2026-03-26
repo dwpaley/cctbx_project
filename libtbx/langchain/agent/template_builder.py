@@ -7,9 +7,12 @@ This module now supports two backends:
 1. YAML-driven ProgramRegistry (preferred)
 2. Legacy JSON command_templates.json (fallback)
 
+NEW: Can delegate to CommandBuilder for unified command generation.
+Set TemplateBuilder.USE_NEW_BUILDER = True to enable.
+
 Usage:
     builder = TemplateBuilder()
-    cmd = builder.build_command("phenix.refine", {"model": "x.pdb", "mtz": "x.mtz"})
+    cmd = builder.build_command("phenix.refine", {"model": "x.pdb", "data_mtz": "x.mtz"})
 """
 
 from __future__ import absolute_import, division, print_function
@@ -29,7 +32,12 @@ class TemplateBuilder(object):
     Converts abstract IntentJSON into concrete CLI strings.
 
     Uses YAML-driven ProgramRegistry.
+
+    NEW: Set USE_NEW_BUILDER = True to delegate to CommandBuilder.
     """
+
+    # Feature flag: Set to True to use new CommandBuilder
+    USE_NEW_BUILDER = False
 
     def __init__(self, template_path=TEMPLATE_PATH, use_yaml=True):
         """
@@ -43,11 +51,19 @@ class TemplateBuilder(object):
         self._registry = None
         self._json_templates = None
         self._template_path = template_path
+        self._command_builder = None  # Lazy-loaded CommandBuilder
 
         if self.use_yaml:
             self._registry = ProgramRegistry(use_yaml=True)
         else:
             self._load_json_templates()
+
+    def _get_command_builder(self):
+        """Get or create CommandBuilder instance (lazy loading)."""
+        if self._command_builder is None:
+            from libtbx.langchain.agent.command_builder import CommandBuilder
+            self._command_builder = CommandBuilder()
+        return self._command_builder
 
     def _load_json_templates(self):
         """Load legacy JSON templates."""
@@ -76,7 +92,7 @@ class TemplateBuilder(object):
 
         Args:
             program (str): e.g., "phenix.refine"
-            files (dict): e.g., {"model": "file.pdb", "mtz": "file.mtz"}
+            files (dict): e.g., {"model": "file.pdb", "data_mtz": "file.mtz"}
                           For multiple files: {"half_map": ["map_1.ccp4", "map_2.ccp4"]}
             strategy (dict): e.g., {"simulated_annealing": True, "nproc": 8}
             log: Optional logging function
@@ -177,6 +193,9 @@ class TemplateBuilder(object):
         """
         THE FALLBACK: Auto-selects files based on extensions and patterns.
 
+        DEPRECATED: This method will be replaced by CommandBuilder.build().
+        Set TemplateBuilder.USE_NEW_BUILDER = True to use the new implementation.
+
         Args:
             program (str): The program to build a command for
             available_files (list): List of available file paths
@@ -193,6 +212,13 @@ class TemplateBuilder(object):
         """
         if log is None:
             log = lambda x: None
+
+        # NEW: Optionally delegate to CommandBuilder
+        if self.USE_NEW_BUILDER:
+            return self._build_via_command_builder(
+                program, available_files, categorized_files,
+                log, context, best_files, rfree_mtz
+            )
 
         # Get template (from YAML or JSON)
         if self.use_yaml:
@@ -218,9 +244,9 @@ class TemplateBuilder(object):
             "pdb_file": "model",
             "map": "map",
             "full_map": "map",
-            "mtz": "mtz",
-            "hkl_file": "mtz",
-            "map_coefficients": "map_coefficients",
+            "data_mtz": "data_mtz",
+            "map_coeffs_mtz": "map_coeffs_mtz",
+            "hkl_file": "data_mtz",
             "sequence": "sequence",
             "seq_file": "sequence",
             "ligand_cif": "ligand_cif",
@@ -233,21 +259,24 @@ class TemplateBuilder(object):
             priority_patterns = slot_def.get("priority_patterns", [])
             is_multiple = slot_def.get("multiple", False)
             is_required = slot_def.get("required", False)
+            # Category-based filtering
+            exclude_categories = slot_def.get("exclude_categories", [])
+            preferred_categories = slot_def.get("preferred_categories", [])
 
-            # PRIORITY 0: Locked R-free MTZ (X-ray refinement only)
+            # PRIORITY 0: Locked R-free data_mtz (X-ray refinement only)
             # Once R-free flags are generated, we MUST use that MTZ for all refinements
             # This overrides all other MTZ selection logic
-            if rfree_mtz and slot_name in ("mtz", "hkl_file") and not is_multiple:
+            if rfree_mtz and slot_name in ("data_mtz", "hkl_file") and not is_multiple:
                 if os.path.exists(rfree_mtz):
                     # Verify extension matches
                     if any(rfree_mtz.lower().endswith(ext) for ext in valid_exts):
                         selected_files[slot_name] = rfree_mtz
                         used_files.add(rfree_mtz)
-                        log("DEBUG: Using LOCKED R-free MTZ for slot '%s': %s" % (
+                        log("DEBUG: Using LOCKED R-free data_mtz for slot '%s': %s" % (
                             slot_name, os.path.basename(rfree_mtz)))
                         continue
                 else:
-                    log("WARNING: Locked R-free MTZ not found: %s" % rfree_mtz)
+                    log("WARNING: Locked R-free data_mtz not found: %s" % rfree_mtz)
 
             # PRIORITY 1: Check best_files for single-file slots
             if best_files and not is_multiple:
@@ -264,6 +293,15 @@ class TemplateBuilder(object):
                                 log("DEBUG: Best %s excluded by pattern '%s': %s" % (
                                     best_category, pattern, os.path.basename(best_path)))
                                 break
+
+                        # Check exclude_categories - best_files must respect category exclusions
+                        if not is_excluded and exclude_categories:
+                            file_stage = self._get_file_stage(best_path)
+                            if file_stage in exclude_categories:
+                                is_excluded = True
+                                log("DEBUG: Best %s excluded by category '%s': %s" % (
+                                    best_category, file_stage, os.path.basename(best_path)))
+
                         if not is_excluded:
                             selected_files[slot_name] = best_path
                             used_files.add(best_path)
@@ -292,6 +330,18 @@ class TemplateBuilder(object):
             # Apply exclude patterns
             for pattern in exclude_patterns:
                 candidates = [f for f in candidates if pattern.lower() not in f.lower()]
+
+            # Apply exclude_categories - filter out files in excluded categories
+            if exclude_categories:
+                filtered_candidates = []
+                for f in candidates:
+                    file_stage = self._get_file_stage(f)
+                    if file_stage in exclude_categories:
+                        log("DEBUG: Candidate excluded by category '%s': %s" % (
+                            file_stage, os.path.basename(f)))
+                    else:
+                        filtered_candidates.append(f)
+                candidates = filtered_candidates
 
             if not candidates:
                 if is_required:
@@ -329,13 +379,44 @@ class TemplateBuilder(object):
             log("ERROR: Failed to build command: %s" % e)
             return None
 
+    def _build_via_command_builder(self, program, available_files, categorized_files,
+                                    log, context, best_files, rfree_mtz):
+        """
+        Delegate command building to the new CommandBuilder.
+
+        This is the compatibility bridge between the old API and new CommandBuilder.
+        """
+        from libtbx.langchain.agent.command_builder import CommandContext
+
+        # Build CommandContext from the scattered parameters
+        cmd_context = CommandContext(
+            cycle_number=context.get("cycle_number", 1) if context else 1,
+            experiment_type=context.get("experiment_type", "") if context else "",
+            resolution=context.get("session_resolution") or context.get("resolution") if context else None,
+            best_files=best_files or {},
+            rfree_mtz=rfree_mtz,
+            categorized_files=categorized_files or {},
+            workflow_state=context.get("workflow_state", {}).get("state", "") if context else "",
+            history=context.get("history", []) if context else [],
+            llm_files=None,  # build_command_for_program doesn't receive LLM hints
+            llm_strategy=None,
+            log=log,
+        )
+
+        builder = self._get_command_builder()
+        return builder.build(program, available_files, cmd_context)
+
     def _yaml_inputs_to_slots(self, prog_def):
         """Convert YAML inputs format to JSON file_slots format."""
         slots = {}
         inputs = prog_def.get("inputs", {})
+        input_priorities = prog_def.get("input_priorities", {})
 
         for section, is_required in [("required", True), ("optional", False)]:
             for slot_name, slot_def in inputs.get(section, {}).items():
+                # Get input priorities for this slot
+                slot_priorities = input_priorities.get(slot_name, {})
+
                 slots[slot_name] = {
                     "extensions": slot_def.get("extensions", []),
                     "flag": slot_def.get("flag", ""),
@@ -344,9 +425,74 @@ class TemplateBuilder(object):
                     "exclude_patterns": slot_def.get("exclude_patterns", []),
                     "prefer_patterns": slot_def.get("prefer_patterns", []),
                     "priority_patterns": slot_def.get("priority_patterns", []),
+                    # Add category-based filtering
+                    "preferred_categories": slot_priorities.get("categories", []),
+                    "exclude_categories": slot_priorities.get("exclude_categories", []),
                 }
 
         return slots
+
+    def _get_file_stage(self, path):
+        """
+        Determine the processing stage of a file from its filename.
+
+        This mirrors the logic in BestFilesTracker._classify_stage.
+
+        Args:
+            path: File path
+
+        Returns:
+            str: Stage name (refined, predicted, phaser_output, etc.)
+        """
+        basename = os.path.basename(path).lower()
+        ext = os.path.splitext(basename)[1]
+
+        # Model files
+        if ext in ['.pdb', '.cif']:
+            if 'refine' in basename and 'real_space' not in basename:
+                return "refined"
+            if 'real_space_refined' in basename or 'rsr_' in basename:
+                return "rsr_output"
+            if 'overall_best' in basename or 'autobuild' in basename:
+                return "autobuild_output"
+            if 'placed' in basename or 'dock' in basename:
+                return "docked"
+            if 'processed' in basename:
+                return "processed_predicted"
+            if 'predict' in basename or 'alphafold' in basename:
+                return "predicted"
+            if 'phaser' in basename:
+                return "phaser_output"
+            return "pdb"
+
+        # MTZ files - classify as data_mtz or map_coeffs_mtz
+        elif ext in ['.mtz', '.sca', '.hkl']:
+            try:
+                from libtbx.langchain.agent.file_utils import classify_mtz_type
+            except ImportError:
+                from agent.file_utils import classify_mtz_type
+            mtz_category = classify_mtz_type(filepath)
+            # For .sca and .hkl, always data
+            if ext in ['.sca', '.hkl']:
+                return "data_mtz"
+            # Return more specific stage for data_mtz
+            if mtz_category == "data_mtz":
+                if '_data.mtz' in basename or 'refinement_data' in basename:
+                    return "original_data_mtz"
+                return "data_mtz"
+            return mtz_category
+
+        # Map files
+        elif ext in ['.mrc', '.ccp4', '.map']:
+            if 'denmod' in basename or 'density_mod' in basename:
+                return "optimized_full_map"
+            if 'sharp' in basename:
+                return "sharpened"
+            if re.search(r'[_-][12ab]\.', basename) or 'half' in basename:
+                return "half_map"
+            return "full_map"
+
+        return "unknown"
 
     def _score_file(self, f, priority_patterns, prefer_patterns):
         """Score a file for selection."""
@@ -364,17 +510,31 @@ class TemplateBuilder(object):
                 score += 100
 
         # General heuristics
-        if "with_ligand" in basename:
+        if "with_ligand" in basename or (
+            "_modified" in basename and basename.endswith(".pdb")):
             score += 50
         if "_refine_" in basename:
+            score += 40
+        if "real_space_refined" in basename or "rsr_" in basename:
             score += 40
         if "phaser" in basename:
             score += 30
 
-        # Prefer higher cycle numbers
+        # Prefer higher cycle numbers (for iterative refinement outputs)
+        # Matches: refine_001_001.pdb, refine_002_001.pdb, etc.
         cycle_match = re.search(r'refine[_.]?(\d+)', basename)
         if cycle_match:
             score += int(cycle_match.group(1)) * 5
+
+        # Matches: rsr_001_real_space_refined_001.pdb, etc.
+        # Use the LAST number in the filename as the iteration number
+        rsr_numbers = re.findall(r'(\d+)', basename)
+        if rsr_numbers and ('rsr' in basename or 'real_space' in basename):
+            # Last number is typically the iteration (000, 001, 002)
+            score += int(rsr_numbers[-1]) * 5
+            # Also add bonus for the cycle number (first number typically)
+            if len(rsr_numbers) > 1:
+                score += int(rsr_numbers[0]) * 2
 
         # Prefer longer names
         score += len(basename) * 0.1
@@ -679,6 +839,16 @@ class TemplateBuilder(object):
                 strategy["resolution"] = round(float(resolution), 1)
                 message = "Auto-filled resolution=%.1fÅ from %s" % (resolution, source)
 
+        # Auto-fill output prefix based on cycle number
+        if fix.get("auto_fill_output_prefix"):
+            if "output_prefix" not in strategy or not strategy.get("output_prefix"):
+                cycle = context.get("cycle_number", 1)
+                prefix_base = fix.get("auto_fill_output_prefix")
+                if prefix_base is True:
+                    prefix_base = "output"
+                strategy["output_prefix"] = "%s_%03d" % (prefix_base, cycle)
+                message = "Auto-filled output_prefix=%s" % strategy["output_prefix"]
+
         return files, strategy, message
 
 
@@ -701,7 +871,7 @@ if __name__ == "__main__":
 
     # Test build_command
     print("Testing build_command for phenix.refine:")
-    files = {"model": "test.pdb", "mtz": "test.mtz"}
+    files = {"model": "test.pdb", "data_mtz": "test.mtz"}
     try:
         cmd = builder.build_command("phenix.refine", files)
         print("  Command:", cmd)
@@ -711,7 +881,7 @@ if __name__ == "__main__":
 
     # Test with strategy
     print("Testing with strategy:")
-    files = {"model": "test.pdb", "mtz": "test.mtz"}
+    files = {"model": "test.pdb", "data_mtz": "test.mtz"}
     strategy = {"generate_rfree_flags": True}
     try:
         cmd = builder.build_command("phenix.refine", files, strategy)
