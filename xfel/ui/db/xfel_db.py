@@ -453,7 +453,7 @@ class xfel_db_application(db_application):
             for item_idx, item in enumerate(r['files']):
               if '-s81-' in item['path']:
                 item['is_present'] = True
-          is_good = all([f['is_present'] for f in r['files']])
+          is_good = r['files'] and all([f['is_present'] for f in r['files']])
         if is_good:
           present_runs.append({'run':str(int(r['run_num']))})
 
