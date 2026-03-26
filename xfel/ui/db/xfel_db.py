@@ -390,7 +390,6 @@ class db_application(object):
           raise e
         retry_count += 1
         print("Couldn't connect to MYSQL, retry", retry_count)
-        print(str(e))
         time.sleep(sleep_time)
         sleep_time *= 2
       except Exception as e:

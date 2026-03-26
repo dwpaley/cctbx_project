@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function
-import os, sys
+import os
 from iotbx.phil import parse
 from libtbx.utils import Sorry
 
@@ -147,9 +147,8 @@ db {
 """
 master_phil_scope = parse(master_phil_str + db_phil_str, process_includes=True)
 
-settings_dir = os.path.join(os.path.expanduser('~'), '.cctbx.xfel')
-#if len(sys.argv)==1:
-if True:
+if len(sys.argv)==1:
+  settings_dir = os.path.join(os.path.expanduser('~'), '.cctbx.xfel')
   settings_file = os.path.join(settings_dir, 'settings.phil')
 else:
   settings_file = os.path.expanduser(sys.argv[1])
