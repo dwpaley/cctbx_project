@@ -116,6 +116,17 @@ filter {
             reference peak(s).
 
 }
+angle_histogram {
+  enable = False
+    .type = bool
+    .help = Plot a histogram of angles between two spots.
+  range1 = None
+    .type = floats
+  range2 = None
+    .type = floats
+  range3 = None
+    .type = floats
+}
 output {
   log = dials.powder_from_spots.log
     .type = str
