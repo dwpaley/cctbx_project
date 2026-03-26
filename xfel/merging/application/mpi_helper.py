@@ -165,6 +165,5 @@ class mpi_helper(object):
           gathered[key] = flumpy.from_numpy(results[key])
       for k, v in zip(expt_ids, identifiers):
         gathered.experiment_identifiers()[k]=str(v)
-      gathered.reset_ids()  
+      gathered.reset_ids()
       return gathered
-
