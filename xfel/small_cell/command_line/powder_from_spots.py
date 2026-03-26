@@ -95,6 +95,9 @@ master_phil = parse(
     .type = space_group
     .help = Show positions of miller indices from this unit_cell and space \
             group. Not implemented.
+  n_max = None
+    .type = int
+    .help = Stop plotting after this many experiments.
 filter {
   enable = False
     .type = bool
