@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function
-import os
+import os, sys
 from iotbx.phil import parse
 from libtbx.utils import Sorry
 
@@ -148,7 +148,6 @@ db {
 master_phil_scope = parse(master_phil_str + db_phil_str, process_includes=True)
 
 settings_dir = os.path.join(os.path.expanduser('~'), '.cctbx.xfel')
-settings_file = os.path.join(settings_dir, 'settings.phil')
 
 known_dials_dispatchers = {
   'cctbx.xfel.xtc_process': 'xfel.command_line.xtc_process',
@@ -167,6 +166,13 @@ def load_phil_scope_from_dispatcher(dispatcher):
   return phil_scope
 
 def load_cached_settings(scope=None, extract=True):
+  # Determine which settings file to use
+  settings_file = os.environ.get('CCTBX_XFEL_SETTINGS')
+  if settings_file is None:
+    settings_file = os.path.join(settings_dir, 'settings.phil')
+
+  print('Load settings from', settings_file)
+
   if scope is None:
     scope = master_phil_scope
   if os.path.exists(settings_file):
@@ -186,6 +192,11 @@ def load_cached_settings(scope=None, extract=True):
       return scope
 
 def save_cached_settings(params):
+  # Save to the file specified by environment or default
+  settings_file = os.environ.get('CCTBX_XFEL_SETTINGS')
+  if settings_file is None:
+    settings_file = os.path.join(settings_dir, 'settings.phil')
+
   if not os.path.exists(settings_dir):
     os.makedirs(settings_dir)
 

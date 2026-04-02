@@ -326,6 +326,44 @@ class TextButtonCtrl(CtrlBase):
     output_box.AddGrowableCol(1, 1)
     self.SetSizer(output_box)
 
+class ComboButtonCtrl(CtrlBase):
+  ''' Generic panel that will place a combo control, with a label and an
+      optional large button, and an optional bitmap button'''
+
+  def __init__(self, parent,
+               label='', label_size=(100, -1),
+               label_style='normal',
+               text_style=wx.TE_LEFT,
+               ctrl_size=(200, -1),
+               big_button=False,
+               big_button_label='Browse...',
+               big_button_size=wx.DefaultSize,
+               ghost_button=True,
+               value='', **kwargs):
+
+    CtrlBase.__init__(self, parent=parent, label_style=label_style, **kwargs)
+
+    output_box = wx.FlexGridSizer(1, 4, 0, 10)
+    self.txt = wx.StaticText(self, label=label, size=label_size)
+    self.txt.SetFont(self.font)
+    output_box.Add(self.txt)
+
+    self.ctr = wx.ComboBox(self, name=self.Name + "_ctr", style=text_style, size=ctrl_size)
+    self.ctr.SetValue(value)
+    output_box.Add(self.ctr, flag=wx.EXPAND)
+
+    self.btn_big = Button(self, name=self.Name + "_btn_big", label=big_button_label, size=big_button_size)
+    if ghost_button:
+      output_box.Add(self.btn_big, flag=wx.RESERVE_SPACE_EVEN_IF_HIDDEN)
+    else:
+      output_box.Add(self.btn_big)
+
+    if not big_button:
+      self.btn_big.Hide()
+
+    output_box.AddGrowableCol(1, 1)
+    self.SetSizer(output_box)
+
 class TwoButtonCtrl(CtrlBase):
   ''' Generic panel that will place a text control, with a label and an
       optional large button, and an optional bitmap button'''
